@@ -50,6 +50,5 @@ services:
 
 databases:
   - name: critmatch-db
-    plan: standard
     databaseName: critmatch
     user: critmatch
