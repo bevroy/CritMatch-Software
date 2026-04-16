@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: critmatch-api
+    env: docker
+    plan: starter
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: FRONTEND_BASE_URL
+        value: https://critmatch.netlify.app
+      - key: DATABASE_URL
+        fromDatabase:
+          name: critmatch-db
+          property: connectionString
+      - key: SENTRY_DSN
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: SMART_CLIENT_ID
+        sync: false
+      - key: SMART_CLIENT_SECRET
+        sync: false
+      - key: SMART_ISSUER_ALLOWLIST
+        sync: false
+      - key: FHIR_BASE_URL
+        sync: false
+      - key: EXPORT_SIGNING_KEY
+        sync: false
+
+databases:
+  - name: critmatch-db
+    plan: starter
+    databaseName: critmatch
+    user: critmatch
