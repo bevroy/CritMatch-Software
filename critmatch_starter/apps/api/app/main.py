@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,9 +10,12 @@ init_sentry()
 
 app = FastAPI(title="CritMatch API", version="0.1.0")
 
+_frontend_origin = (os.getenv("FRONTEND_BASE_URL") or "").rstrip("/")
+_allowed_origins = [_frontend_origin] if _frontend_origin else ["http://localhost:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
