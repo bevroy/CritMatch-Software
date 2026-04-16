@@ -12,10 +12,6 @@ services:
         value: production
       - key: FRONTEND_BASE_URL
         value: https://critmatch.netlify.app
-      - key: DATABASE_URL
-        fromDatabase:
-          name: critmatch-db
-          property: connectionString
       - key: SENTRY_DSN
         sync: false
       - key: SESSION_SECRET
@@ -30,26 +26,3 @@ services:
         sync: false
       - key: EXPORT_SIGNING_KEY
         sync: false
-
-  - type: worker
-    name: critmatch-worker
-    env: docker
-    plan: standard
-    rootDir: critmatch_starter/apps/worker
-    dockerfilePath: Dockerfile
-    autoDeploy: true
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: critmatch-db
-          property: connectionString
-      - key: SENTRY_DSN
-        sync: false
-
-databases:
-  - name: critmatch-db
-    plan: basic-256mb
-    databaseName: critmatch
-    user: critmatch
