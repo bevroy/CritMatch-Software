@@ -1,10 +1,11 @@
 services:
   - type: web
     name: critmatch-api
-    env: docker
+    runtime: python
     plan: standard
     rootDir: critmatch_starter/apps/api
-    dockerfilePath: Dockerfile
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     autoDeploy: true
     healthCheckPath: /health
     envVars:
