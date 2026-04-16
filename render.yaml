@@ -50,5 +50,6 @@ services:
 
 databases:
   - name: critmatch-db
+    plan: basic-256mb
     databaseName: critmatch
     user: critmatch
