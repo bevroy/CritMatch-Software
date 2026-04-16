@@ -53,7 +53,7 @@ python app/main.py
 ```
 
 ## Deployment
-- Netlify deploys the frontend from `apps/web`
-- Render deploys the API from `apps/api`
-- Render deploys the worker from `apps/worker`
+- Netlify deploys the frontend from `critmatch_starter/apps/web`
+- Render deploys the API from `critmatch_starter/apps/api`
+- Render deploys the worker from `critmatch_starter/apps/worker`
 - Render provisions the Postgres database
