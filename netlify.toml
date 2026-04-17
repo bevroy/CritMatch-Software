@@ -5,7 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NEXT_PUBLIC_API_BASE_URL = "https://critmatch-software.onrender.com"
+  NEXT_PUBLIC_API_BASE_URL = "https://critmatch-api-8kdp.onrender.com"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

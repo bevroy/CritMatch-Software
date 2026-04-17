@@ -1,44 +1,51 @@
-const results = [
-  { patientId: "patient-001", age: 67, sex: "Female", site: "Cardiology Clinic", matchReason: "Matched myocardial infarction" },
-  { patientId: "patient-002", age: 58, sex: "Male", site: "General Medicine", matchReason: "Matched myocardial infarction" },
-];
+"use client";
+
+import { useEffect, useState } from "react";
+import { fetchAuditEvents, type AuditEvent } from "../../lib/api";
 
 export default function ResultsPage() {
+  const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAuditEvents()
+      .then(setEvents)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
   return (
     <main className="container">
       <div style={{ marginBottom: "1rem" }}>
-        <h1>Results</h1>
-        <p style={{ color: "#475569" }}>Filter and review candidate patients.</p>
-      </div>
-
-      <div className="card" style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-        <input className="input" style={{ maxWidth: "200px" }} placeholder="Filter by site" />
-        <input className="input" style={{ maxWidth: "200px" }} placeholder="Filter by age" />
-        <input className="input" style={{ maxWidth: "200px" }} placeholder="Filter by sex" />
-        <button className="button">Export CSV</button>
+        <h1>Results &amp; Audit Log</h1>
+        <p style={{ color: "#475569" }}>Review query runs and audit events.</p>
       </div>
 
       <div className="card">
         <table>
           <thead>
             <tr>
-              <th>Patient ID</th>
-              <th>Age</th>
-              <th>Sex</th>
-              <th>Site</th>
-              <th>Matched Rule</th>
+              <th>Action</th>
+              <th>Object Type</th>
+              <th>Object ID</th>
+              <th>Timestamp</th>
             </tr>
           </thead>
           <tbody>
-            {results.map((row) => (
-              <tr key={row.patientId}>
-                <td>{row.patientId}</td>
-                <td>{row.age}</td>
-                <td>{row.sex}</td>
-                <td>{row.site}</td>
-                <td>{row.matchReason}</td>
-              </tr>
-            ))}
+            {loading ? (
+              <tr><td colSpan={4}>Loading…</td></tr>
+            ) : events.length === 0 ? (
+              <tr><td colSpan={4}>No events yet. Run a query to generate audit entries.</td></tr>
+            ) : (
+              events.map((e, i) => (
+                <tr key={i}>
+                  <td>{e.action}</td>
+                  <td>{e.objectType}</td>
+                  <td>{e.objectId}</td>
+                  <td>{e.createdAt}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
