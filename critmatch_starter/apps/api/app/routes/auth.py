@@ -238,8 +238,8 @@ def smart_callback(
         key=settings.session_cookie_name,
         value=session_token,
         httponly=True,
-        secure=settings.is_production,
-        samesite="lax",
+        secure=settings.is_production or settings.session_cookie_samesite == "none",
+        samesite=settings.session_cookie_samesite,
         max_age=settings.session_ttl_seconds,
         path="/",
     )

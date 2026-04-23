@@ -73,4 +73,9 @@ def create_criteria_set(
         extra={"study_id": str(study.id), "version": payload.version},
     )
     db.commit()
-    return {"study_id": str(study.id), "saved": True, "version": payload.version}
+    return {
+        "id": str(cs.id),
+        "study_id": str(study.id),
+        "saved": True,
+        "version": payload.version,
+    }

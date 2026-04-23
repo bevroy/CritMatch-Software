@@ -34,6 +34,12 @@ class Settings:
     session_ttl_seconds: int = field(
         default_factory=lambda: int(os.getenv("SESSION_TTL_SECONDS", str(60 * 60 * 8)))
     )
+    # "lax" works for same-site deployments. For a Netlify frontend talking to a
+    # Render API on a different domain, set this to "none" (and the cookie will
+    # be marked Secure automatically).
+    session_cookie_samesite: str = field(
+        default_factory=lambda: os.getenv("SESSION_COOKIE_SAMESITE", "lax").lower()
+    )
 
     # SMART on FHIR
     smart_client_id: str = field(default_factory=lambda: os.getenv("SMART_CLIENT_ID", ""))
