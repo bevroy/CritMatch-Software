@@ -2,9 +2,9 @@
 set -e
 
 if [ -n "$DATABASE_URL" ]; then
-  # If the schema already exists (from a pre-Alembic bootstrap) but the
-  # alembic_version table is missing, stamp the baseline so we don't try
-  # to re-create tables.
+  # Probe the DB. If schema exists but alembic_version is missing, exit 2
+  # so we can stamp the baseline. Use ||true so 'set -e' doesn't abort.
+  set +e
   python - <<'PY'
 import os, sys
 from sqlalchemy import create_engine, inspect
@@ -24,6 +24,8 @@ if "alembic_version" not in tables and "users" in tables:
 sys.exit(0)
 PY
   rc=$?
+  set -e
+
   if [ "$rc" = "2" ]; then
     alembic stamp 0001_initial
   elif [ "$rc" != "0" ]; then
