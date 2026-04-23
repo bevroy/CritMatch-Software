@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routes import audit, auth, query, studies, terminology
+from app.routes import audit, auth, query, runs, studies, terminology
 from app.sentry_setup import init_sentry
 
 init_sentry()
@@ -22,6 +22,7 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(studies.router, prefix="/api/studies", tags=["studies"])
 app.include_router(terminology.router, prefix="/api/terminology", tags=["terminology"])
 app.include_router(query.router, prefix="/api/query", tags=["query"])
+app.include_router(runs.router, prefix="/api/runs", tags=["runs"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 
 

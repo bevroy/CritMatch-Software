@@ -27,6 +27,7 @@ jobs:
         env:
           DATABASE_URL: sqlite+pysqlite:///:memory:
           SESSION_SECRET: ci-secret
+          EXPORT_SIGNING_KEY: ci-export-key
           APP_ENV: test
           FRONTEND_BASE_URL: http://localhost:3000
         run: pytest -q
