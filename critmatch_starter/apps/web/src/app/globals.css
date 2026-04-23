@@ -97,6 +97,12 @@ thead th {
   gap: 0.6rem;
 }
 
+.brand-logo {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
 .brand-name {
   font-weight: 700;
   font-size: 1.1rem;

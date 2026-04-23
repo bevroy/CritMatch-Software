@@ -22,11 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Image
                 src="/critmatch-logo.png"
                 alt="CritMatch logo"
-                width={40}
-                height={40}
+                width={552}
+                height={138}
                 priority
+                className="brand-logo"
               />
-              <span className="brand-name">CritMatch</span>
             </Link>
           </div>
         </header>
