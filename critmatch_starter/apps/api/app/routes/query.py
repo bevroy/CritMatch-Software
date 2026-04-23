@@ -1,29 +1,50 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
-from app.db.models import AuditLog, QueryRun
+from app.db.models import CriteriaSet, QueryRun, Study
 from app.db.session import get_db
+from app.deps.auth import CurrentUser
 from app.schemas.query import QueryRunRequest
+from app.services.audit_service import record as record_audit
 
 router = APIRouter()
 
 
 @router.post("/run")
-def run_query(payload: QueryRunRequest, db: Session = Depends(get_db)) -> dict:
+def run_query(
+    payload: QueryRunRequest,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    study = db.get(Study, payload.studyId)
+    if study is None:
+        raise HTTPException(status_code=404, detail="Study not found")
+    if study.owner_user_id and study.owner_user_id != user.id and user.role != "admin":
+        raise HTTPException(status_code=403, detail="Not allowed for this study")
+
+    cs = db.get(CriteriaSet, payload.criteriaSetId)
+    if cs is None or cs.study_id != study.id:
+        raise HTTPException(status_code=404, detail="Criteria set not found for study")
+
     qr = QueryRun(
-        study_id=payload.studyId,
-        criteria_set_id=payload.criteriaSetId,
+        study_id=study.id,
+        criteria_set_id=cs.id,
+        run_by=user.id,
         status="queued",
     )
     db.add(qr)
     db.flush()
 
-    audit = AuditLog(
+    record_audit(
+        db,
+        user_id=user.id,
         action="query_run",
-        object_type="study",
-        object_id=str(payload.studyId),
+        object_type="query_run",
+        object_id=str(qr.id),
+        request=request,
+        extra={"study_id": str(study.id), "criteria_set_id": str(cs.id)},
     )
-    db.add(audit)
     db.commit()
     db.refresh(qr)
 
