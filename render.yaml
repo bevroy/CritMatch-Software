@@ -22,9 +22,13 @@ services:
         sync: false
       - key: SMART_ISSUER_ALLOWLIST
         sync: false
+      - key: SMART_REDIRECT_URI
+        sync: false
       - key: FHIR_BASE_URL
         sync: false
       - key: EXPORT_SIGNING_KEY
+        sync: false
+      - key: MRN_HASH_SALT
         sync: false
       - key: DATABASE_URL
         sync: false
@@ -32,9 +36,19 @@ services:
     name: critmatch-worker
     env: docker
     plan: free
-    rootDir: critmatch_starter/apps/worker
-    dockerfilePath: ./Dockerfile
+    rootDir: critmatch_starter
+    dockerfilePath: apps/worker/Dockerfile
     autoDeploy: true
     envVars:
+      - key: APP_ENV
+        value: production
+      - key: SENTRY_DSN
+        sync: false
+      - key: FHIR_BASE_URL
+        sync: false
+      - key: FHIR_ACCESS_TOKEN
+        sync: false
+      - key: MRN_HASH_SALT
+        sync: false
       - key: DATABASE_URL
         sync: false
