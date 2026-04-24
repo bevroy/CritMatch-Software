@@ -120,6 +120,44 @@ export function createCriteriaSet(
   });
 }
 
+export interface CriteriaSetSummary {
+  id: string;
+  studyId: string;
+  version: number;
+  logicJson: CriteriaLogic;
+  createdAt: string;
+}
+
+export function fetchCriteriaSets(studyId: string): Promise<CriteriaSetSummary[]> {
+  return apiFetch(`/api/studies/${studyId}/criteria-sets`);
+}
+
+export interface RunSummary {
+  id: string;
+  criteriaSetId: string;
+  status: string;
+  resultCount: number | null;
+  executionMs: number | null;
+  createdAt: string;
+}
+
+export interface StudyRunsPage {
+  studyId: string;
+  total: number;
+  limit: number;
+  offset: number;
+  items: RunSummary[];
+}
+
+export function fetchStudyRuns(
+  studyId: string,
+  limit = 50,
+  offset = 0,
+): Promise<StudyRunsPage> {
+  const qs = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return apiFetch(`/api/studies/${studyId}/runs?${qs.toString()}`);
+}
+
 /* ── Terminology ── */
 
 export interface Expansion {
@@ -213,6 +251,22 @@ export function createExportLink(runId: string, ttlSeconds = 300): Promise<Expor
 
 export function exportDownloadUrl(downloadPath: string): string {
   return `${API_BASE}${downloadPath}`;
+}
+
+export function cancelRun(runId: string): Promise<{ runId: string; status: string }> {
+  return apiFetch(`/api/runs/${runId}/cancel`, { method: "POST" });
+}
+
+export interface RetryRunResult {
+  runId: string;
+  studyId: string;
+  criteriaSetId: string;
+  status: string;
+  retriedFrom: string;
+}
+
+export function retryRun(runId: string): Promise<RetryRunResult> {
+  return apiFetch(`/api/runs/${runId}/retry`, { method: "POST" });
 }
 
 /* ── Audit ── */

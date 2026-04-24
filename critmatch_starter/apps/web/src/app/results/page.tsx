@@ -4,10 +4,12 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ApiError,
+  cancelRun,
   createExportLink,
   exportDownloadUrl,
   fetchRun,
   fetchRunResults,
+  retryRun,
   type RunDetail,
   type RunResultRow,
 } from "../../lib/api";
@@ -76,6 +78,29 @@ function ResultsInner() {
     }
   }
 
+  async function handleCancel() {
+    if (!run) return;
+    setError(null);
+    try {
+      await cancelRun(run.id);
+      await load(run.id);
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
+
+  async function handleRetry() {
+    if (!run) return;
+    setError(null);
+    try {
+      const next = await retryRun(run.id);
+      setRunId(next.runId);
+      await load(next.runId);
+    } catch (e) {
+      setError(describeError(e));
+    }
+  }
+
   return (
     <main className="container">
       <div style={{ marginBottom: "1rem" }}>
@@ -109,14 +134,34 @@ function ResultsInner() {
               <div><strong>Execution:</strong> {run.executionMs != null ? `${run.executionMs} ms` : "—"}</div>
               <div style={{ color: "#94a3b8", fontSize: "0.85rem" }}>{run.id}</div>
             </div>
-            <button
-              className="button"
-              onClick={handleExport}
-              disabled={exporting || run.status !== "completed"}
-              title={run.status !== "completed" ? "Available once the run completes" : ""}
-            >
-              {exporting ? "Preparing…" : "Export CSV"}
-            </button>
+            <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+              {(run.status === "queued" || run.status === "running" || run.status === "claimed") && (
+                <button
+                  className="button"
+                  style={{ background: "white", color: "#0f172a", border: "1px solid #cbd5e1" }}
+                  onClick={handleCancel}
+                >
+                  Cancel
+                </button>
+              )}
+              {(run.status === "failed" || run.status === "cancelled") && (
+                <button
+                  className="button"
+                  style={{ background: "white", color: "#0f172a", border: "1px solid #cbd5e1" }}
+                  onClick={handleRetry}
+                >
+                  Retry
+                </button>
+              )}
+              <button
+                className="button"
+                onClick={handleExport}
+                disabled={exporting || run.status !== "completed"}
+                title={run.status !== "completed" ? "Available once the run completes" : ""}
+              >
+                {exporting ? "Preparing…" : "Export CSV"}
+              </button>
+            </div>
           </div>
         </div>
       )}

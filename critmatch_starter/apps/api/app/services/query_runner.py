@@ -43,6 +43,11 @@ from app.db.models import CriteriaSet, QueryResult, QueryRun
 from app.fhir.client import FHIRClient
 
 
+def _current_status(db: Session, run_id) -> str | None:
+    """Read just the current status without disturbing the in-memory instance."""
+    return db.query(QueryRun.status).filter(QueryRun.id == run_id).scalar()
+
+
 class QueryExecutionError(RuntimeError):
     pass
 
@@ -186,6 +191,10 @@ def run_query(db: Session, run_id: str, *, fhir_client: FHIRClient | None = None
     if qr is None:
         raise QueryExecutionError(f"QueryRun {run_id} not found")
 
+    if qr.status == "cancelled":
+        # User cancelled between claim and execution; do not run.
+        return 0
+
     cs = db.get(CriteriaSet, qr.criteria_set_id)
     if cs is None:
         raise QueryExecutionError("CriteriaSet missing for run")
@@ -220,12 +229,15 @@ def run_query(db: Session, run_id: str, *, fhir_client: FHIRClient | None = None
             )
         qr.result_count = len(matches)
         qr.execution_ms = int((time.monotonic() - started) * 1000)
-        qr.status = "completed"
+        # Respect a cancel that arrived mid-execution.
+        if _current_status(db, qr.id) != "cancelled":
+            qr.status = "completed"
         db.commit()
         return len(matches)
     except Exception as exc:  # noqa: BLE001 - record failure then re-raise
-        qr.status = "failed"
         qr.execution_ms = int((time.monotonic() - started) * 1000)
+        if _current_status(db, qr.id) != "cancelled":
+            qr.status = "failed"
         db.commit()
         raise QueryExecutionError(str(exc)) from exc
 

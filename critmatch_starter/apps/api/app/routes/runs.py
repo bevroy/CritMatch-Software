@@ -86,6 +86,90 @@ def list_results(
 
 
 # ---------------------------------------------------------------------------
+# Lifecycle: cancel + retry
+# ---------------------------------------------------------------------------
+
+
+_CANCELLABLE_STATUSES = {"queued", "claimed", "running"}
+_RETRYABLE_STATUSES = {"failed", "cancelled"}
+
+
+@router.post("/{run_id}/cancel")
+def cancel_run(
+    run_id: str,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    qr = db.get(QueryRun, run_id)
+    if qr is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    _ensure_owner(qr, db, user)
+    if qr.status not in _CANCELLABLE_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run not cancellable in status '{qr.status}'",
+        )
+
+    qr.status = "cancelled"
+    record_audit(
+        db,
+        user_id=user.id,
+        action="query_run_cancel",
+        object_type="query_run",
+        object_id=str(qr.id),
+        request=request,
+    )
+    db.commit()
+    return {"runId": str(qr.id), "status": qr.status}
+
+
+@router.post("/{run_id}/retry")
+def retry_run(
+    run_id: str,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    qr = db.get(QueryRun, run_id)
+    if qr is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    _ensure_owner(qr, db, user)
+    if qr.status not in _RETRYABLE_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run not retryable in status '{qr.status}'",
+        )
+
+    new_run = QueryRun(
+        study_id=qr.study_id,
+        criteria_set_id=qr.criteria_set_id,
+        run_by=user.id,
+        status="queued",
+    )
+    db.add(new_run)
+    db.flush()
+    record_audit(
+        db,
+        user_id=user.id,
+        action="query_run_retry",
+        object_type="query_run",
+        object_id=str(new_run.id),
+        request=request,
+        extra={"retried_from": str(qr.id)},
+    )
+    db.commit()
+    db.refresh(new_run)
+    return {
+        "runId": str(new_run.id),
+        "studyId": str(new_run.study_id),
+        "criteriaSetId": str(new_run.criteria_set_id),
+        "status": new_run.status,
+        "retriedFrom": str(qr.id),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Signed CSV export
 # ---------------------------------------------------------------------------
 
