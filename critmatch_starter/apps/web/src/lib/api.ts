@@ -360,3 +360,71 @@ export function fhirPing(): Promise<FhirPing> {
   return apiFetch("/api/fhir/ping");
 }
 
+
+/* ── Sharing / RBAC ── */
+
+export type AccessLevel = "none" | "viewer" | "editor" | "owner" | "admin";
+
+export interface CollaboratorOwner {
+  userId: string;
+  name: string;
+  email: string | null;
+}
+
+export interface CollaboratorEntry {
+  userId: string;
+  role: "viewer" | "editor";
+  name: string | null;
+  email: string | null;
+  createdAt: string;
+}
+
+export interface CollaboratorList {
+  studyId: string;
+  owner: CollaboratorOwner | null;
+  myAccess: AccessLevel;
+  items: CollaboratorEntry[];
+}
+
+export function fetchCollaborators(studyId: string): Promise<CollaboratorList> {
+  return apiFetch(`/api/studies/${studyId}/collaborators`);
+}
+
+export function addCollaborator(
+  studyId: string,
+  userId: string,
+  role: "viewer" | "editor",
+): Promise<{ studyId: string; userId: string; role: string }> {
+  return apiFetch(`/api/studies/${studyId}/collaborators`, {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId, role }),
+  });
+}
+
+export function removeCollaborator(
+  studyId: string,
+  userId: string,
+): Promise<{ studyId: string; userId: string; removed: boolean }> {
+  return apiFetch(`/api/studies/${studyId}/collaborators/${userId}`, {
+    method: "DELETE",
+  });
+}
+
+export function transferStudy(studyId: string, ownerUserId: string): Promise<Study> {
+  return apiFetch(`/api/studies/${studyId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ owner_user_id: ownerUserId }),
+  });
+}
+
+export interface UserSearchResult {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string;
+}
+
+export function searchUsers(q: string, limit = 20): Promise<UserSearchResult[]> {
+  const qs = new URLSearchParams({ q, limit: String(limit) });
+  return apiFetch(`/api/studies/_users/search?${qs.toString()}`);
+}

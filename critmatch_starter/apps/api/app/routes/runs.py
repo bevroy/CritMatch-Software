@@ -17,17 +17,15 @@ from app.core.config import get_settings
 from app.db.models import QueryResult, QueryRun, Study
 from app.db.session import get_db
 from app.deps.auth import CurrentUser
+from app.services.access import require_access
 from app.services.audit_service import record as record_audit
 
 router = APIRouter()
 
 
-def _ensure_owner(qr: QueryRun, db: Session, user) -> None:
+def _ensure_owner(qr: QueryRun, db: Session, user, *, minimum: str = "viewer") -> None:
     study = db.get(Study, qr.study_id)
-    if study is None:
-        raise HTTPException(status_code=404, detail="Study not found")
-    if study.owner_user_id and study.owner_user_id != user.id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not allowed")
+    require_access(study, user, db, minimum=minimum)  # type: ignore[arg-type]
 
 
 @router.get("/{run_id}")
@@ -104,7 +102,7 @@ def cancel_run(
     qr = db.get(QueryRun, run_id)
     if qr is None:
         raise HTTPException(status_code=404, detail="Run not found")
-    _ensure_owner(qr, db, user)
+    _ensure_owner(qr, db, user, minimum="editor")
     if qr.status not in _CANCELLABLE_STATUSES:
         raise HTTPException(
             status_code=409,
@@ -134,7 +132,7 @@ def retry_run(
     qr = db.get(QueryRun, run_id)
     if qr is None:
         raise HTTPException(status_code=404, detail="Run not found")
-    _ensure_owner(qr, db, user)
+    _ensure_owner(qr, db, user, minimum="editor")
     if qr.status not in _RETRYABLE_STATUSES:
         raise HTTPException(
             status_code=409,

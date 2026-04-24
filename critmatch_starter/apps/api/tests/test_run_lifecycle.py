@@ -101,7 +101,8 @@ def test_other_users_study_runs_forbidden(authed_client, db_session):
     db_session.commit()
 
     resp = authed_client.get(f"/api/studies/{study.id}/runs")
-    assert resp.status_code == 403
+    # Non-collaborators see 404 to avoid enumeration of study IDs.
+    assert resp.status_code == 404
 
 
 def test_get_study_detail(authed_client, authed_user, db_session):

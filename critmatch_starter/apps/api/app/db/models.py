@@ -36,6 +36,29 @@ class Study(Base):
 
     owner: Mapped[User | None] = relationship(back_populates="studies")
     criteria_sets: Mapped[list["CriteriaSet"]] = relationship(back_populates="study", cascade="all, delete-orphan")
+    collaborators: Mapped[list["StudyCollaborator"]] = relationship(
+        back_populates="study", cascade="all, delete-orphan"
+    )
+
+
+class StudyCollaborator(Base):
+    __tablename__ = "study_collaborators"
+    __table_args__ = (UniqueConstraint("study_id", "user_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("studies.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(Text, nullable=False, default="viewer")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    study: Mapped[Study] = relationship(back_populates="collaborators")
+    user: Mapped[User] = relationship()
 
 
 class CriteriaSet(Base):

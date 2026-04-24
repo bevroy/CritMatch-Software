@@ -16,6 +16,7 @@ import {
   type RunSummary,
   type Study,
 } from "../../../lib/api";
+import SharingPanel from "./SharingPanel";
 
 function describeError(e: unknown): string {
   if (e instanceof ApiError) {
@@ -379,6 +380,8 @@ export default function StudyDetailPage({ params }: PageParams) {
           </>
         )}
       </section>
+
+      <SharingPanel studyId={study.id} onOwnerChanged={loadAll} />
     </main>
   );
 }

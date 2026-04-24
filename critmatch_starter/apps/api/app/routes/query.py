@@ -5,6 +5,7 @@ from app.db.models import CriteriaSet, QueryRun, Study
 from app.db.session import get_db
 from app.deps.auth import CurrentUser
 from app.schemas.query import QueryRunRequest
+from app.services.access import require_access
 from app.services.audit_service import record as record_audit
 
 router = APIRouter()
@@ -18,10 +19,8 @@ def run_query(
     db: Session = Depends(get_db),
 ) -> dict:
     study = db.get(Study, payload.studyId)
-    if study is None:
-        raise HTTPException(status_code=404, detail="Study not found")
-    if study.owner_user_id and study.owner_user_id != user.id and user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not allowed for this study")
+    require_access(study, user, db, minimum="editor")
+    assert study is not None
 
     cs = db.get(CriteriaSet, payload.criteriaSetId)
     if cs is None or cs.study_id != study.id:
