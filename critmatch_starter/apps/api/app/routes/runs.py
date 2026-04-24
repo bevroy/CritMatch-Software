@@ -280,3 +280,64 @@ def download_export(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="run-{qr.id}.csv"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# Cohort diff
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{base_run_id}/diff/{compare_run_id}")
+def diff_runs(
+    base_run_id: str,
+    compare_run_id: str,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+    sample: int = Query(default=50, ge=0, le=500),
+) -> dict:
+    """Compare patient cohorts between two runs of the same study.
+
+    Returns counts plus bounded samples of the added/removed patient ids.
+    """
+
+    base = db.get(QueryRun, base_run_id)
+    compare = db.get(QueryRun, compare_run_id)
+    if base is None or compare is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    _ensure_owner(base, db, user)
+    _ensure_owner(compare, db, user)
+
+    if base.study_id != compare.study_id:
+        raise HTTPException(status_code=400, detail="Runs belong to different studies")
+    if base.status != "completed" or compare.status != "completed":
+        raise HTTPException(status_code=409, detail="Both runs must be completed to diff")
+
+    base_ids = {
+        pid
+        for (pid,) in db.query(QueryResult.patient_id)
+        .filter(QueryResult.query_run_id == base.id)
+        .all()
+    }
+    compare_ids = {
+        pid
+        for (pid,) in db.query(QueryResult.patient_id)
+        .filter(QueryResult.query_run_id == compare.id)
+        .all()
+    }
+
+    added = compare_ids - base_ids
+    removed = base_ids - compare_ids
+    unchanged = base_ids & compare_ids
+
+    return {
+        "baseRunId": str(base.id),
+        "compareRunId": str(compare.id),
+        "baseTotal": len(base_ids),
+        "compareTotal": len(compare_ids),
+        "added": sorted(added)[:sample],
+        "removed": sorted(removed)[:sample],
+        "addedCount": len(added),
+        "removedCount": len(removed),
+        "unchangedCount": len(unchanged),
+        "sample": sample,
+    }

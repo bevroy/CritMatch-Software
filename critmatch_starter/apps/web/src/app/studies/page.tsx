@@ -95,7 +95,11 @@ export default function StudiesPage() {
                 const runs = runsByStudy[study.id];
                 const rows = [
                   <tr key={study.id}>
-                    <td>{study.name}</td>
+                    <td>
+                      <Link href={`/studies/${encodeURIComponent(study.id)}`} style={{ color: "#1d4ed8" }}>
+                        {study.name}
+                      </Link>
+                    </td>
                     <td>{study.description || "—"}</td>
                     <td>{study.status}</td>
                     <td>

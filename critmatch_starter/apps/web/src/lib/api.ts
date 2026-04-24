@@ -72,6 +72,10 @@ export function fetchStudies(): Promise<Study[]> {
   return apiFetch("/api/studies");
 }
 
+export function fetchStudy(studyId: string): Promise<Study> {
+  return apiFetch(`/api/studies/${studyId}`);
+}
+
 export function createStudy(name: string, description?: string): Promise<Study> {
   return apiFetch("/api/studies", {
     method: "POST",
@@ -269,16 +273,59 @@ export function retryRun(runId: string): Promise<RetryRunResult> {
   return apiFetch(`/api/runs/${runId}/retry`, { method: "POST" });
 }
 
+export interface RunDiff {
+  baseRunId: string;
+  compareRunId: string;
+  baseTotal: number;
+  compareTotal: number;
+  added: string[];
+  removed: string[];
+  addedCount: number;
+  removedCount: number;
+  unchangedCount: number;
+  sample: number;
+}
+
+export function diffRuns(baseRunId: string, compareRunId: string, sample = 50): Promise<RunDiff> {
+  const qs = new URLSearchParams({ sample: String(sample) });
+  return apiFetch(`/api/runs/${baseRunId}/diff/${compareRunId}?${qs.toString()}`);
+}
+
 /* ── Audit ── */
 
 export interface AuditEvent {
+  userId: string | null;
   action: string;
   objectType: string;
-  objectId: string;
+  objectId: string | null;
+  metadata: Record<string, unknown> | null;
   createdAt: string;
 }
 
-export function fetchAuditEvents(): Promise<AuditEvent[]> {
-  return apiFetch("/api/audit");
+export interface AuditPage {
+  total: number;
+  limit: number;
+  offset: number;
+  items: AuditEvent[];
+}
+
+export interface AuditFilters {
+  action?: string;
+  objectType?: string;
+  objectId?: string;
+  userId?: string;
+  since?: string;
+  until?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export function fetchAuditEvents(filters: AuditFilters = {}): Promise<AuditPage> {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(filters)) {
+    if (v !== undefined && v !== "" && v !== null) qs.set(k, String(v));
+  }
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch(`/api/audit${suffix}`);
 }
 

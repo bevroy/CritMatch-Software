@@ -41,6 +41,9 @@ export default function SiteHeader() {
           <Link href="/studies">Studies</Link>
           <Link href="/builder">Builder</Link>
           <Link href="/results">Results</Link>
+          {loaded && session && (session.role === "admin" || session.role === "auditor") ? (
+            <Link href="/audit">Audit</Link>
+          ) : null}
           {loaded && session ? (
             <>
               <span style={{ color: "#475569", fontSize: "0.875rem" }}>

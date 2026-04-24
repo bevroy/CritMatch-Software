@@ -50,6 +50,15 @@ def list_studies(user: CurrentUser, db: Session = Depends(get_db)) -> list[Study
     return list(query.order_by(Study.created_at.desc()).all())
 
 
+@router.get("/{study_id}", response_model=StudyResponse)
+def get_study(
+    study_id: str,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> Study:
+    return _ensure_study_access(db, study_id, user)
+
+
 @router.post("/{study_id}/criteria-sets")
 def create_criteria_set(
     study_id: str,

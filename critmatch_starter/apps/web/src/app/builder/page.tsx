@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ApiError,
   createCriteriaSet,
@@ -54,10 +54,12 @@ function toRule(c: Criterion): CriteriaRule {
   return { id: c.id, kind: c.kind, label: c.label, codes };
 }
 
-export default function BuilderPage() {
+function BuilderInner() {
   const router = useRouter();
+  const params = useSearchParams();
+  const presetStudyId = params.get("study") || "";
   const [studies, setStudies] = useState<Study[]>([]);
-  const [studyId, setStudyId] = useState<string>("");
+  const [studyId, setStudyId] = useState<string>(presetStudyId);
   const [operator, setOperator] = useState<"AND" | "OR">("AND");
 
   const [kind, setKind] = useState<Kind>("condition");
@@ -78,10 +80,15 @@ export default function BuilderPage() {
     fetchStudies()
       .then((s) => {
         setStudies(s);
-        if (s.length > 0) setStudyId(s[0].id);
+        if (presetStudyId && s.some((x) => x.id === presetStudyId)) {
+          setStudyId(presetStudyId);
+        } else if (!studyId && s.length > 0) {
+          setStudyId(s[0].id);
+        }
       })
       .catch((e) => setError(describeError(e)));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [presetStudyId]);
 
   async function handleAdd() {
     setError(null);
@@ -302,5 +309,13 @@ export default function BuilderPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function BuilderPage() {
+  return (
+    <Suspense fallback={<main className="container"><div className="card">Loading…</div></main>}>
+      <BuilderInner />
+    </Suspense>
   );
 }

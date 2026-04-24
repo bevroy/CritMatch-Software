@@ -104,6 +104,20 @@ def test_other_users_study_runs_forbidden(authed_client, db_session):
     assert resp.status_code == 403
 
 
+def test_get_study_detail(authed_client, authed_user, db_session):
+    study, _cs, _ = _seed_study_with_runs(db_session, authed_user.id)
+    resp = authed_client.get(f"/api/studies/{study.id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == str(study.id)
+    assert body["name"] == "S1"
+
+
+def test_get_study_detail_404(authed_client):
+    resp = authed_client.get(f"/api/studies/{uuid.uuid4()}")
+    assert resp.status_code == 404
+
+
 def test_query_runner_skips_cancelled_run(db_session, authed_user):
     """If a run was cancelled before the worker started executing, run_query bails out."""
     from app.db.models import CriteriaSet, QueryResult, QueryRun, Study
