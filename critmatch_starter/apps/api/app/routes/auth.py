@@ -321,39 +321,43 @@ def dev_login(
             extra={"role": payload.role, "app_env": settings.app_env},
         )
         db.commit()
+
+        session_token = issue_session_token(
+            {
+                "sub": str(user.id),
+                "role": user.role,
+                "iss": "dev",
+                "patient": None,
+                "fhirUser": None,
+                "scope": "dev",
+            }
+        )
+        response.set_cookie(
+            key=settings.session_cookie_name,
+            value=session_token,
+            httponly=True,
+            secure=settings.is_production or settings.session_cookie_samesite == "none",
+            samesite=settings.session_cookie_samesite,
+            max_age=settings.session_ttl_seconds,
+            path="/",
+        )
+
+        return SessionResponse(
+            user_id=str(user.id),
+            role=user.role,
+            patient_context=None,
+            signature_verified=True,
+        )
+    except HTTPException:
+        raise
     except Exception as exc:  # noqa: BLE001 - surface real error to dev caller
         db.rollback()
+        import traceback
+        tb = traceback.format_exc().splitlines()[-6:]
         raise HTTPException(
             status_code=500,
-            detail=f"dev_login failed: {type(exc).__name__}: {exc}",
+            detail=f"dev_login failed: {type(exc).__name__}: {exc} | tb={tb}",
         ) from exc
-
-    session_token = issue_session_token(
-        {
-            "sub": str(user.id),
-            "role": user.role,
-            "iss": "dev",
-            "patient": None,
-            "fhirUser": None,
-            "scope": "dev",
-        }
-    )
-    response.set_cookie(
-        key=settings.session_cookie_name,
-        value=session_token,
-        httponly=True,
-        secure=settings.is_production or settings.session_cookie_samesite == "none",
-        samesite=settings.session_cookie_samesite,
-        max_age=settings.session_ttl_seconds,
-        path="/",
-    )
-
-    return SessionResponse(
-        user_id=str(user.id),
-        role=user.role,
-        patient_context=None,
-        signature_verified=True,
-    )
 
 
 @router.get("/dev-login/enabled")
@@ -362,4 +366,4 @@ def dev_login_enabled() -> dict:
     available = settings.dev_login_enabled and (
         not settings.is_production or settings.dev_login_allow_prod
     )
-    return {"enabled": bool(available), "build": "diag-2"}
+    return {"enabled": bool(available), "build": "diag-3"}
