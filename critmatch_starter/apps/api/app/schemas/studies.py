@@ -16,6 +16,7 @@ class StudyResponse(BaseModel):
     name: str
     description: Optional[str] = None
     status: str
+    myAccess: Optional[str] = None  # noqa: N815 - serialised camelCase for the web client
 
     @field_validator("id", mode="before")
     @classmethod

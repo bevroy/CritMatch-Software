@@ -16,6 +16,10 @@ const PAGE_SIZE = 50;
 
 const COMMON_ACTIONS = [
   "study_create",
+  "study_transfer",
+  "study_collaborator_add",
+  "study_collaborator_update",
+  "study_collaborator_remove",
   "criteria_set_create",
   "query_run",
   "query_run_cancel",

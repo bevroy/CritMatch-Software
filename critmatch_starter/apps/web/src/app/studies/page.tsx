@@ -198,6 +198,22 @@ export default function StudiesPage() {
                       <Link href={`/studies/${encodeURIComponent(study.id)}`} style={{ color: "#1d4ed8" }}>
                         {study.name}
                       </Link>
+                      {study.myAccess && study.myAccess !== "owner" && (
+                        <span
+                          title={`Your access: ${study.myAccess}`}
+                          style={{
+                            marginLeft: "0.5rem",
+                            padding: "0.1rem 0.45rem",
+                            borderRadius: "999px",
+                            fontSize: "0.7rem",
+                            background: study.myAccess === "admin" ? "#fef3c7" : "#e0e7ff",
+                            color: study.myAccess === "admin" ? "#92400e" : "#3730a3",
+                            verticalAlign: "middle",
+                          }}
+                        >
+                          {study.myAccess === "admin" ? "admin" : `shared · ${study.myAccess}`}
+                        </span>
+                      )}
                     </td>
                     <td>{study.description || "—"}</td>
                     <td>{study.status}</td>

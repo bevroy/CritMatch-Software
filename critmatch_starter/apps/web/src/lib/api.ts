@@ -77,6 +77,7 @@ export interface Study {
   name: string;
   description: string | null;
   status: string;
+  myAccess?: "viewer" | "editor" | "owner" | "admin" | null;
 }
 
 export function fetchStudies(): Promise<Study[]> {

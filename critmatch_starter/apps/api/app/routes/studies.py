@@ -36,7 +36,7 @@ def create_study(
     request: Request,
     user: CurrentUser,
     db: Session = Depends(get_db),
-) -> Study:
+) -> StudyResponse:
     study = Study(name=payload.name, description=payload.description, owner_user_id=user.id)
     db.add(study)
     db.flush()
@@ -50,21 +50,44 @@ def create_study(
     )
     db.commit()
     db.refresh(study)
-    return study
+    return StudyResponse(
+        id=str(study.id),
+        name=study.name,
+        description=study.description,
+        status=study.status,
+        myAccess="owner" if user.role != "admin" else "admin",
+    )
 
 
 @router.get("", response_model=list[StudyResponse])
-def list_studies(user: CurrentUser, db: Session = Depends(get_db)) -> list[Study]:
+def list_studies(user: CurrentUser, db: Session = Depends(get_db)) -> list[StudyResponse]:
     query = db.query(Study)
+    collab_roles: dict[uuid.UUID, str] = {}
     if user.role != "admin":
-        # Owned OR shared via collaborator
-        collab_study_ids = db.query(StudyCollaborator.study_id).filter(
-            StudyCollaborator.user_id == user.id
-        )
+        collab_rows = db.query(StudyCollaborator).filter(StudyCollaborator.user_id == user.id).all()
+        collab_roles = {row.study_id: row.role for row in collab_rows}
         query = query.filter(
-            or_(Study.owner_user_id == user.id, Study.id.in_(collab_study_ids))
+            or_(Study.owner_user_id == user.id, Study.id.in_(list(collab_roles.keys())))
         )
-    return list(query.order_by(Study.created_at.desc()).all())
+    studies = query.order_by(Study.created_at.desc()).all()
+
+    def _level(s: Study) -> str:
+        if user.role == "admin":
+            return "admin"
+        if s.owner_user_id == user.id:
+            return "owner"
+        return collab_roles.get(s.id, "viewer")
+
+    return [
+        StudyResponse(
+            id=str(s.id),
+            name=s.name,
+            description=s.description,
+            status=s.status,
+            myAccess=_level(s),
+        )
+        for s in studies
+    ]
 
 
 @router.get("/{study_id}", response_model=StudyResponse)
@@ -72,8 +95,15 @@ def get_study(
     study_id: str,
     user: CurrentUser,
     db: Session = Depends(get_db),
-) -> Study:
-    return _study_for(db, study_id, user)
+) -> StudyResponse:
+    study = _study_for(db, study_id, user)
+    return StudyResponse(
+        id=str(study.id),
+        name=study.name,
+        description=study.description,
+        status=study.status,
+        myAccess=access_level(study, user, db),
+    )
 
 
 @router.post("/{study_id}/criteria-sets")

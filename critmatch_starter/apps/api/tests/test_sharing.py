@@ -70,6 +70,11 @@ def test_viewer_can_read_but_not_run(client, db_session):
     # Viewer can list studies and see this one.
     listing = client.get("/api/studies").json()
     assert any(s["id"] == str(study.id) for s in listing)
+    entry = next(s for s in listing if s["id"] == str(study.id))
+    assert entry["myAccess"] == "viewer"
+
+    detail = client.get(f"/api/studies/{study.id}").json()
+    assert detail["myAccess"] == "viewer"
 
     # Viewer cannot create criteria sets.
     create = client.post(
