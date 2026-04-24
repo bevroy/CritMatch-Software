@@ -340,3 +340,23 @@ export function fetchAuditEvents(filters: AuditFilters = {}): Promise<AuditPage>
   return apiFetch(`/api/audit${suffix}`);
 }
 
+/* ── FHIR connectivity ── */
+
+export interface FhirPing {
+  ok: boolean;
+  configured: boolean;
+  url?: string;
+  status?: number;
+  elapsedMs?: number;
+  fhirVersion?: string;
+  software?: string;
+  publisher?: string;
+  resourceTypes?: string[];
+  resourceCount?: number;
+  reason?: string;
+}
+
+export function fhirPing(): Promise<FhirPing> {
+  return apiFetch("/api/fhir/ping");
+}
+
