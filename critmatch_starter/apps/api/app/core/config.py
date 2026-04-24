@@ -57,6 +57,15 @@ class Settings:
         default_factory=lambda: os.getenv("EXPORT_SIGNING_KEY", "")
     )
 
+    # Dev-only: mint a local session without a real EHR. Off by default and
+    # ignored in production unless DEV_LOGIN_ALLOW_PROD=1 is also set.
+    dev_login_enabled: bool = field(
+        default_factory=lambda: os.getenv("DEV_LOGIN_ENABLED", "0") in {"1", "true", "True"}
+    )
+    dev_login_allow_prod: bool = field(
+        default_factory=lambda: os.getenv("DEV_LOGIN_ALLOW_PROD", "0") in {"1", "true", "True"}
+    )
+
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}

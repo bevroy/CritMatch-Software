@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  ApiError,
   createStudy,
+  devLogin,
+  devLoginEnabled,
   fetchStudies,
   fetchStudyRuns,
   type RunSummary,
@@ -13,27 +16,71 @@ import {
 export default function StudiesPage() {
   const [studies, setStudies] = useState<Study[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [runsByStudy, setRunsByStudy] = useState<Record<string, RunSummary[]>>({});
   const [runsLoading, setRunsLoading] = useState<string | null>(null);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [devLoginAvailable, setDevLoginAvailable] = useState(false);
+  const [devLoginBusy, setDevLoginBusy] = useState(false);
 
   useEffect(() => {
     fetchStudies()
-      .then(setStudies)
-      .catch(() => {})
+      .then((s) => {
+        setStudies(s);
+      })
+      .catch((e: unknown) => {
+        if (e instanceof ApiError && e.status === 401) {
+          setAuthRequired(true);
+        } else if (e instanceof ApiError) {
+          setLoadError(`${e.message}${e.body ? ` – ${JSON.stringify(e.body)}` : ""}`);
+        } else {
+          setLoadError((e as Error).message ?? "Failed to load studies");
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (!authRequired) return;
+    devLoginEnabled()
+      .then((r) => setDevLoginAvailable(r.enabled))
+      .catch(() => setDevLoginAvailable(false));
+  }, [authRequired]);
+
+  async function handleDevLogin(role: "research_user" | "admin" | "auditor") {
+    setDevLoginBusy(true);
+    try {
+      await devLogin(role);
+      window.location.reload();
+    } catch (e) {
+      setLoadError(e instanceof ApiError ? `${e.message}` : (e as Error).message);
+      setDevLoginBusy(false);
+    }
+  }
+
   async function handleCreate() {
+    setCreateError(null);
     if (!name.trim()) return;
-    const study = await createStudy(name, description || undefined);
-    setStudies((prev) => [study, ...prev]);
-    setName("");
-    setDescription("");
-    setShowForm(false);
+    try {
+      const study = await createStudy(name, description || undefined);
+      setStudies((prev) => [study, ...prev]);
+      setName("");
+      setDescription("");
+      setShowForm(false);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        setAuthRequired(true);
+      } else if (e instanceof ApiError) {
+        setCreateError(`${e.message}${e.body ? ` – ${JSON.stringify(e.body)}` : ""}`);
+      } else {
+        setCreateError((e as Error).message ?? "Failed to create study");
+      }
+    }
   }
 
   async function toggleRuns(studyId: string) {
@@ -61,16 +108,66 @@ export default function StudiesPage() {
           <h1>Studies</h1>
           <p style={{ color: "#475569" }}>Saved cohort definitions and study workspaces.</p>
         </div>
-        <button className="button" onClick={() => setShowForm(!showForm)}>
+        <button
+          className="button"
+          onClick={() => setShowForm(!showForm)}
+          disabled={authRequired}
+          title={authRequired ? "Sign in first" : ""}
+        >
           {showForm ? "Cancel" : "New Study"}
         </button>
       </div>
 
-      {showForm && (
+      {authRequired && (
+        <div className="card" style={{ marginBottom: "1rem", borderLeft: "4px solid #b45309" }}>
+          <strong>You&apos;re not signed in.</strong>
+          <p style={{ margin: "0.25rem 0 0", color: "#475569" }}>
+            CritMatch authenticates through SMART-on-FHIR. Launch the app from your EHR, or visit{" "}
+            <Link href="/launch" style={{ color: "#1d4ed8" }}>/launch</Link> with the right{" "}
+            <code>iss</code> parameter to start a session.
+          </p>
+          {devLoginAvailable && (
+            <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+              <span style={{ color: "#475569", fontSize: "0.85rem" }}>Dev sign in:</span>
+              <button
+                className="button"
+                style={{ padding: "0.4rem 0.75rem" }}
+                disabled={devLoginBusy}
+                onClick={() => handleDevLogin("research_user")}
+              >
+                {devLoginBusy ? "Signing in…" : "Researcher"}
+              </button>
+              <button
+                className="button"
+                style={{ padding: "0.4rem 0.75rem", background: "white", color: "#0f172a", border: "1px solid #cbd5e1" }}
+                disabled={devLoginBusy}
+                onClick={() => handleDevLogin("admin")}
+              >
+                Admin
+              </button>
+              <button
+                className="button"
+                style={{ padding: "0.4rem 0.75rem", background: "white", color: "#0f172a", border: "1px solid #cbd5e1" }}
+                disabled={devLoginBusy}
+                onClick={() => handleDevLogin("auditor")}
+              >
+                Auditor
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {loadError && !authRequired && (
+        <div className="card" style={{ marginBottom: "1rem", color: "#b91c1c" }}>{loadError}</div>
+      )}
+
+      {showForm && !authRequired && (
         <div className="card" style={{ marginBottom: "1rem", display: "grid", gap: "0.75rem" }}>
           <input className="input" placeholder="Study name" value={name} onChange={(e) => setName(e.target.value)} />
           <input className="input" placeholder="Description (optional)" value={description} onChange={(e) => setDescription(e.target.value)} />
           <button className="button" onClick={handleCreate}>Create Study</button>
+          {createError && <p style={{ color: "#b91c1c", margin: 0 }}>{createError}</p>}
         </div>
       )}
 
@@ -87,6 +184,8 @@ export default function StudiesPage() {
           <tbody>
             {loading ? (
               <tr><td colSpan={4}>Loading…</td></tr>
+            ) : authRequired ? (
+              <tr><td colSpan={4} style={{ color: "#94a3b8" }}>Sign in to view studies.</td></tr>
             ) : studies.length === 0 ? (
               <tr><td colSpan={4}>No studies yet. Click &quot;New Study&quot; to create one.</td></tr>
             ) : (

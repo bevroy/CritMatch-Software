@@ -32,6 +32,13 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Dev-only convenience login. Disabled by default; set DEV_LOGIN_ENABLED=1
+      # in the Render dashboard to allow it. DEV_LOGIN_ALLOW_PROD=1 is also
+      # required because APP_ENV=production above.
+      - key: DEV_LOGIN_ENABLED
+        sync: false
+      - key: DEV_LOGIN_ALLOW_PROD
+        sync: false
   - type: worker
     name: critmatch-worker
     env: docker

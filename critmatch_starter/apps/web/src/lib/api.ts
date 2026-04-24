@@ -59,6 +59,17 @@ export function smartCallback(code: string, state: string): Promise<SessionInfo>
   });
 }
 
+export function devLoginEnabled(): Promise<{ enabled: boolean }> {
+  return apiFetch("/api/auth/dev-login/enabled");
+}
+
+export function devLogin(role: "research_user" | "admin" | "auditor" = "research_user", name = "Dev User"): Promise<SessionInfo> {
+  return apiFetch("/api/auth/dev-login", {
+    method: "POST",
+    body: JSON.stringify({ role, name }),
+  });
+}
+
 /* ── Studies ── */
 
 export interface Study {

@@ -269,3 +269,90 @@ def me(request: Request, user: CurrentUser) -> SessionResponse:
         patient_context=claims.get("patient"),
         signature_verified=bool(claims.get("_signature_verified", True)),
     )
+
+
+# ---------------------------------------------------------------------------
+# Dev login (non-production convenience)
+# ---------------------------------------------------------------------------
+
+
+class DevLoginRequest(BaseModel):
+    name: str = Field(default="Dev User")
+    role: str = Field(default="research_user")
+
+
+@router.post("/dev-login", response_model=SessionResponse)
+def dev_login(
+    payload: DevLoginRequest,
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> SessionResponse:
+    settings = get_settings()
+    if not settings.dev_login_enabled:
+        raise HTTPException(status_code=404, detail="Not found")
+    if settings.is_production and not settings.dev_login_allow_prod:
+        raise HTTPException(status_code=403, detail="Dev login disabled in production")
+    if payload.role not in {"research_user", "admin", "auditor"}:
+        raise HTTPException(status_code=400, detail="Unsupported role")
+
+    ehr_user_id = f"dev:{payload.role}:{payload.name}"
+    user = db.query(User).filter(User.ehr_user_id == ehr_user_id).first()
+    if not user:
+        user = User(
+            id=uuid.uuid4(),
+            ehr_user_id=ehr_user_id,
+            name=payload.name,
+            role=payload.role,
+        )
+        db.add(user)
+        db.flush()
+    else:
+        user.role = payload.role
+
+    record_audit(
+        db,
+        user_id=user.id,
+        action="dev_login",
+        object_type="session",
+        object_id=str(user.id),
+        request=request,
+        extra={"role": payload.role, "app_env": settings.app_env},
+    )
+    db.commit()
+
+    session_token = issue_session_token(
+        {
+            "sub": str(user.id),
+            "role": user.role,
+            "iss": "dev",
+            "patient": None,
+            "fhirUser": None,
+            "scope": "dev",
+        }
+    )
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=session_token,
+        httponly=True,
+        secure=settings.is_production or settings.session_cookie_samesite == "none",
+        samesite=settings.session_cookie_samesite,
+        max_age=settings.session_ttl_seconds,
+        path="/",
+    )
+
+    return SessionResponse(
+        user_id=str(user.id),
+        role=user.role,
+        patient_context=None,
+        signature_verified=True,
+    )
+
+
+@router.get("/dev-login/enabled")
+def dev_login_enabled() -> dict:
+    settings = get_settings()
+    available = settings.dev_login_enabled and (
+        not settings.is_production or settings.dev_login_allow_prod
+    )
+    return {"enabled": bool(available)}
