@@ -39,6 +39,8 @@ def ready() -> dict[str, str]:
 
     from app.db.session import SessionLocal
 
+    if not settings.session_secret:
+        return {"status": "degraded", "reason": "SESSION_SECRET not configured"}
     if SessionLocal is None:
         return {"status": "degraded", "reason": "DATABASE_URL not configured"}
     try:

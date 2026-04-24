@@ -350,13 +350,11 @@ def dev_login(
         )
     except HTTPException:
         raise
-    except Exception as exc:  # noqa: BLE001 - surface real error to dev caller
+    except Exception as exc:  # noqa: BLE001 - surface configuration errors
         db.rollback()
-        import traceback
-        tb = traceback.format_exc().splitlines()[-6:]
         raise HTTPException(
             status_code=500,
-            detail=f"dev_login failed: {type(exc).__name__}: {exc} | tb={tb}",
+            detail=f"dev_login failed: {type(exc).__name__}: {exc}",
         ) from exc
 
 
@@ -366,4 +364,4 @@ def dev_login_enabled() -> dict:
     available = settings.dev_login_enabled and (
         not settings.is_production or settings.dev_login_allow_prod
     )
-    return {"enabled": bool(available), "build": "diag-3"}
+    return {"enabled": bool(available)}
