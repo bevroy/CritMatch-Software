@@ -297,29 +297,36 @@ def dev_login(
         raise HTTPException(status_code=400, detail="Unsupported role")
 
     ehr_user_id = f"dev:{payload.role}:{payload.name}"
-    user = db.query(User).filter(User.ehr_user_id == ehr_user_id).first()
-    if not user:
-        user = User(
-            id=uuid.uuid4(),
-            ehr_user_id=ehr_user_id,
-            name=payload.name,
-            role=payload.role,
-        )
-        db.add(user)
-        db.flush()
-    else:
-        user.role = payload.role
+    try:
+        user = db.query(User).filter(User.ehr_user_id == ehr_user_id).first()
+        if not user:
+            user = User(
+                id=uuid.uuid4(),
+                ehr_user_id=ehr_user_id,
+                name=payload.name,
+                role=payload.role,
+            )
+            db.add(user)
+            db.flush()
+        else:
+            user.role = payload.role
 
-    record_audit(
-        db,
-        user_id=user.id,
-        action="dev_login",
-        object_type="session",
-        object_id=str(user.id),
-        request=request,
-        extra={"role": payload.role, "app_env": settings.app_env},
-    )
-    db.commit()
+        record_audit(
+            db,
+            user_id=user.id,
+            action="dev_login",
+            object_type="session",
+            object_id=str(user.id),
+            request=request,
+            extra={"role": payload.role, "app_env": settings.app_env},
+        )
+        db.commit()
+    except Exception as exc:  # noqa: BLE001 - surface real error to dev caller
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"dev_login failed: {type(exc).__name__}: {exc}",
+        ) from exc
 
     session_token = issue_session_token(
         {
