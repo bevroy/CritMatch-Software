@@ -429,3 +429,45 @@ export function searchUsers(q: string, limit = 20): Promise<UserSearchResult[]> 
   const qs = new URLSearchParams({ q, limit: String(limit) });
   return apiFetch(`/api/studies/_users/search?${qs.toString()}`);
 }
+
+/* ── Notifications ── */
+
+export interface NotificationItem {
+  id: string;
+  kind: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface NotificationPage {
+  items: NotificationItem[];
+  total: number;
+  unread: number;
+  limit: number;
+  offset: number;
+}
+
+export function fetchNotifications(opts?: { unreadOnly?: boolean; limit?: number; offset?: number }): Promise<NotificationPage> {
+  const qs = new URLSearchParams();
+  if (opts?.unreadOnly) qs.set("unread_only", "true");
+  if (opts?.limit != null) qs.set("limit", String(opts.limit));
+  if (opts?.offset != null) qs.set("offset", String(opts.offset));
+  const tail = qs.toString();
+  return apiFetch(`/api/notifications${tail ? `?${tail}` : ""}`);
+}
+
+export function fetchUnreadCount(): Promise<{ unread: number }> {
+  return apiFetch("/api/notifications/unread-count");
+}
+
+export function markNotificationRead(id: string): Promise<{ ok: true }> {
+  return apiFetch(`/api/notifications/${id}/read`, { method: "POST" });
+}
+
+export function markAllNotificationsRead(): Promise<{ ok: true; marked: number }> {
+  return apiFetch("/api/notifications/read-all", { method: "POST" });
+}

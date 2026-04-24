@@ -11,6 +11,7 @@ from app.deps.auth import CurrentUser
 from app.schemas.studies import CriteriaSetCreate, StudyCreate, StudyResponse
 from app.services.access import VALID_COLLAB_ROLES, access_level, require_access
 from app.services.audit_service import record as record_audit
+from app.services.notifications import notify
 
 router = APIRouter()
 
@@ -311,6 +312,20 @@ def add_collaborator(
         request=request,
         extra={"target_user_id": str(target.id), "role": payload.role},
     )
+    if target.id != user.id:
+        notify(
+            db,
+            user_id=target.id,
+            kind="study_shared" if action == "study_collaborator_add" else "study_role_changed",
+            title=(
+                f"You were added to “{study.name}” as {payload.role}"
+                if action == "study_collaborator_add"
+                else f"Your role on “{study.name}” is now {payload.role}"
+            ),
+            body=f"Shared by {user.name}.",
+            link=f"/studies/{study.id}",
+            metadata={"studyId": str(study.id), "role": payload.role, "actorUserId": str(user.id)},
+        )
     db.commit()
     return {
         "studyId": str(study.id),
@@ -391,6 +406,16 @@ def transfer_ownership(
             "to_user_id": str(new_owner.id),
         },
     )
+    if new_owner.id != user.id:
+        notify(
+            db,
+            user_id=new_owner.id,
+            kind="study_ownership_transferred",
+            title=f"You are now the owner of “{study.name}”",
+            body=f"Transferred by {user.name}.",
+            link=f"/studies/{study.id}",
+            metadata={"studyId": str(study.id), "actorUserId": str(user.id)},
+        )
     db.commit()
     db.refresh(study)
     return study

@@ -11,6 +11,7 @@ import {
   logout,
   type SessionInfo,
 } from "../lib/api";
+import NotificationsBell from "./NotificationsBell";
 
 export default function SiteHeader() {
   const router = useRouter();
@@ -73,6 +74,7 @@ export default function SiteHeader() {
           ) : null}
           {loaded && session ? (
             <>
+              <NotificationsBell />
               <span style={{ color: "#475569", fontSize: "0.875rem" }}>
                 {session.role}
                 {session.patient_context ? ` · patient ${session.patient_context}` : ""}
