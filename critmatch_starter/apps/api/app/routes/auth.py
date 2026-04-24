@@ -362,4 +362,4 @@ def dev_login_enabled() -> dict:
     available = settings.dev_login_enabled and (
         not settings.is_production or settings.dev_login_allow_prod
     )
-    return {"enabled": bool(available)}
+    return {"enabled": bool(available), "build": "diag-2"}
