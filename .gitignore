@@ -39,3 +39,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# CritMatch MVP
+critmatch_mvp_starter_package.zip
