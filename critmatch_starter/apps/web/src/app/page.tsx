@@ -25,8 +25,7 @@ export default function HomePage() {
           for your trial.
         </p>
         <div className="hero-card-actions">
-          <Link href="/demo" className="button">🔎 Try the Demo</Link>
-          <Link href="/cohort" className="button-secondary">🧩 Build a Cohort</Link>
+          <Link href="/cohort" className="button">🧩 Build a Cohort</Link>
           <Link href="/studies" className="button-secondary">📋 View Studies</Link>
         </div>
       </section>

@@ -526,18 +526,6 @@ a.card p {
   box-shadow: 0 4px 16px rgba(15, 58, 58, 0.25);
 }
 
-/* Demo page two-column layout */
-.demo-grid {
-  display: grid;
-  grid-template-columns: minmax(320px, 420px) 1fr;
-}
-
-@media (max-width: 900px) {
-  .demo-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 /* Page header strip — appears under the navigation card on every non-home page */
 .page-header {
   max-width: 1180px;
