@@ -79,20 +79,26 @@ export default function SiteHeader() {
     return pathname === href || pathname.startsWith(href + "/");
   }
 
+  const isHome = pathname === "/";
+
   return (
     <>
       <header className="site-header">
         <div className="site-header-inner">
-          <Link href="/" className="brand">
-            <Image
-              src="/critmatch-logo-mark.png"
-              alt="CritMatch — Smarter Matches. Better Trials. Real Impact."
-              width={216}
-              height={110}
-              priority
-              className="brand-logo"
-            />
-          </Link>
+          {isHome ? (
+            <span className="brand brand-spacer" aria-hidden="true" />
+          ) : (
+            <Link href="/" className="brand">
+              <Image
+                src="/critmatch-logo-mark.png"
+                alt="CritMatch — Smarter Matches. Better Trials. Real Impact."
+                width={216}
+                height={110}
+                priority
+                className="brand-logo"
+              />
+            </Link>
+          )}
           <div className="session-controls">
             {loaded && session ? (
               <>

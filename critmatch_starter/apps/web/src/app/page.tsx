@@ -14,9 +14,6 @@ export default function HomePage() {
           priority
           className="brand-hero-logo"
         />
-        <div className="brand-hero-tagline">
-          Smarter Matches. Better Trials. Real Impact.
-        </div>
       </section>
 
       {/* Primary CTA card */}
