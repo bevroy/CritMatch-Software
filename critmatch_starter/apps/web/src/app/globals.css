@@ -264,7 +264,7 @@ tbody tr:hover {
 /* Navigation card (RealDiag-style) */
 .nav-card {
   max-width: 1180px;
-  margin: 0.5rem auto 0;
+  margin: 1.25rem auto 0;
   padding: 0 1.75rem;
 }
 
@@ -276,21 +276,43 @@ tbody tr:hover {
   overflow: hidden;
 }
 
+.nav-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.4rem 0.6rem 0.4rem 0;
+}
+
 .nav-toggle {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.95rem 1.25rem;
+  padding: 0.85rem 1.25rem;
   font-weight: 800;
   color: var(--cm-teal);
   cursor: pointer;
   user-select: none;
   background: transparent;
   border: none;
-  width: 100%;
   text-align: left;
   font-family: inherit;
   font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.nav-toggle-chevron {
+  font-size: 0.78rem;
+  opacity: 0.6;
+  margin-left: 0.25rem;
+}
+
+.nav-session {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .nav-toggle-icon {

@@ -110,76 +110,74 @@ export default function SiteHeader() {
 
   return (
     <>
-      <header className="site-header">
-        <div className="site-header-inner">
-          <span className="brand brand-spacer" aria-hidden="true" />
-          <div className="session-controls">
-            {loaded && session ? (
-              <>
-                <NotificationsBell />
-                <span className="session-meta">
-                  {session.role}
-                  {session.patient_context ? ` · patient ${session.patient_context}` : ""}
-                </span>
-                <button
-                  className="button-secondary"
-                  style={{ padding: "0.4rem 0.95rem", fontSize: "0.85rem" }}
-                  onClick={handleLogout}
-                >
-                  Sign out
-                </button>
-              </>
-            ) : loaded && devAvailable ? (
-              <>
-                <span className="session-meta">Dev sign in:</span>
-                <button
-                  className="button"
-                  style={{ padding: "0.4rem 0.95rem", fontSize: "0.85rem" }}
-                  onClick={() => handleDevSignIn("research_user")}
-                  disabled={signingIn}
-                >
-                  Researcher
-                </button>
-                <button
-                  className="button-secondary"
-                  style={{ padding: "0.4rem 0.95rem", fontSize: "0.85rem" }}
-                  onClick={() => handleDevSignIn("admin")}
-                  disabled={signingIn}
-                >
-                  Admin
-                </button>
-                <button
-                  className="button-secondary"
-                  style={{ padding: "0.4rem 0.95rem", fontSize: "0.85rem" }}
-                  onClick={() => handleDevSignIn("auditor")}
-                  disabled={signingIn}
-                >
-                  Auditor
-                </button>
-              </>
-            ) : loaded ? (
-              <Link href="/launch" className="button-secondary" style={{ padding: "0.4rem 0.95rem", fontSize: "0.85rem" }}>
-                Sign in
-              </Link>
-            ) : null}
-          </div>
-        </div>
-      </header>
-
       <div className="nav-card">
         <div className="nav-card-inner">
-          <button
-            type="button"
-            className="nav-toggle"
-            onClick={() => setNavOpen((o) => !o)}
-            aria-expanded={navOpen}
-          >
-            <span className="nav-toggle-icon">≡</span>
-            <span>Navigation</span>
-            <span style={{ marginLeft: "auto", fontSize: "0.85rem", opacity: 0.7 }}>
-              {navOpen ? "▲" : "▼"}
-            </span>
-          </button>
+          <div className="nav-bar">
+            <button
+              type="button"
+              className="nav-toggle"
+              onClick={() => setNavOpen((o) => !o)}
+              aria-expanded={navOpen}
+            >
+              <span className="nav-toggle-icon">≡</span>
+              <span>Navigation</span>
+              <span className="nav-toggle-chevron">{navOpen ? "▲" : "▼"}</span>
+            </button>
+            <div className="nav-session">
+              {loaded && session ? (
+                <>
+                  <NotificationsBell />
+                  <span className="session-meta">
+                    {session.role}
+                    {session.patient_context ? ` · patient ${session.patient_context}` : ""}
+                  </span>
+                  <button
+                    className="button-secondary"
+                    style={{ padding: "0.35rem 0.85rem", fontSize: "0.82rem" }}
+                    onClick={handleLogout}
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : loaded && devAvailable ? (
+                <>
+                  <span className="session-meta">Dev sign in:</span>
+                  <button
+                    className="button"
+                    style={{ padding: "0.35rem 0.85rem", fontSize: "0.82rem" }}
+                    onClick={() => handleDevSignIn("research_user")}
+                    disabled={signingIn}
+                  >
+                    Researcher
+                  </button>
+                  <button
+                    className="button-secondary"
+                    style={{ padding: "0.35rem 0.85rem", fontSize: "0.82rem" }}
+                    onClick={() => handleDevSignIn("admin")}
+                    disabled={signingIn}
+                  >
+                    Admin
+                  </button>
+                  <button
+                    className="button-secondary"
+                    style={{ padding: "0.35rem 0.85rem", fontSize: "0.82rem" }}
+                    onClick={() => handleDevSignIn("auditor")}
+                    disabled={signingIn}
+                  >
+                    Auditor
+                  </button>
+                </>
+              ) : loaded ? (
+                <Link
+                  href="/launch"
+                  className="button-secondary"
+                  style={{ padding: "0.35rem 0.85rem", fontSize: "0.82rem" }}
+                >
+                  Sign in
+                </Link>
+              ) : null}
+            </div>
+          </div>
           {navOpen && (
             <div className="nav-tiles">
               {navItems.map((item) => (
