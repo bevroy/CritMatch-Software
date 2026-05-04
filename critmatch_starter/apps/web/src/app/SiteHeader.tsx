@@ -112,20 +112,7 @@ export default function SiteHeader() {
     <>
       <header className="site-header">
         <div className="site-header-inner">
-          {isHome ? (
-            <span className="brand brand-spacer" aria-hidden="true" />
-          ) : (
-            <Link href="/" className="brand">
-              <Image
-                src="/critmatch-logo-mark.png"
-                alt="CritMatch — Smarter Matches. Better Trials. Real Impact."
-                width={216}
-                height={110}
-                priority
-                className="brand-logo"
-              />
-            </Link>
-          )}
+          <span className="brand brand-spacer" aria-hidden="true" />
           <div className="session-controls">
             {loaded && session ? (
               <>
