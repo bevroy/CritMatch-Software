@@ -22,6 +22,14 @@ class Settings:
     frontend_base_url: str = field(
         default_factory=lambda: (os.getenv("FRONTEND_BASE_URL") or "").rstrip("/")
     )
+    # Optional CSV of additional origins (e.g. Netlify preview deploys).
+    extra_allowed_origins: list[str] = field(
+        default_factory=lambda: _split_csv(os.getenv("ALLOWED_ORIGINS", ""))
+    )
+    # Optional regex for dynamic origins (e.g. r"https://.*--critmatch-software\.netlify\.app").
+    allowed_origin_regex: str = field(
+        default_factory=lambda: os.getenv("ALLOWED_ORIGIN_REGEX", "")
+    )
 
     # Database
     database_url: str = field(default_factory=lambda: os.getenv("DATABASE_URL", ""))
@@ -72,9 +80,16 @@ class Settings:
 
     @property
     def allowed_origins(self) -> list[str]:
+        origins: list[str] = []
         if self.frontend_base_url:
-            return [self.frontend_base_url]
-        return ["http://localhost:3000"]
+            origins.append(self.frontend_base_url)
+        for o in self.extra_allowed_origins:
+            cleaned = o.rstrip("/")
+            if cleaned and cleaned not in origins:
+                origins.append(cleaned)
+        if not origins:
+            origins = ["http://localhost:3000"]
+        return origins
 
 
 _settings: Settings | None = None
