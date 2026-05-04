@@ -48,6 +48,11 @@ export default function SiteHeader() {
       .catch(() => setDevAvailable(false));
   }, [loaded, session]);
 
+  // Collapse the navigation tile grid whenever the route changes.
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
+
   async function handleLogout() {
     try { await logout(); } catch { /* noop */ }
     setSession(null);
