@@ -1,4 +1,10 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000";
+// If NEXT_PUBLIC_API_BASE_URL is explicitly set (even to ""), use it. An
+// empty string means "same-origin" — used in production where Netlify
+// proxies /api/* to the API so the session cookie stays first-party.
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL !== undefined
+    ? process.env.NEXT_PUBLIC_API_BASE_URL
+    : "http://localhost:8000";
 
 export class ApiError extends Error {
   status: number;
