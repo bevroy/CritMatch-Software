@@ -67,8 +67,9 @@ export default function SiteHeader() {
         </Link>
         <nav style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
           <Link href="/studies">Studies</Link>
-          <Link href="/builder">Builder</Link>
+          <Link href="/cohort">Cohort Builder</Link>
           <Link href="/feasibility">Feasibility</Link>
+          <Link href="/edc">EDC</Link>
           <Link href="/results">Results</Link>
           {loaded && session && (session.role === "admin" || session.role === "auditor") ? (
             <Link href="/audit">Audit</Link>

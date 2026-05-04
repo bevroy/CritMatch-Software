@@ -648,3 +648,212 @@ def remove_investigator(
     )
     db.commit()
     return {"id": str(inv_uuid), "removed": True}
+
+
+# ---------------------------------------------------------------------------
+# Participants
+# ---------------------------------------------------------------------------
+from datetime import datetime as _dt
+
+from app.db.models import StudyParticipant as _SP
+from app.schemas.edc import (
+    ParticipantCreate as _PCreate,
+    ParticipantPromote as _PPromote,
+    ParticipantResponse as _PResp,
+    ParticipantUpdate as _PUpdate,
+)
+
+
+def _serialize_p(p: _SP) -> _PResp:
+    return _PResp(
+        id=str(p.id),
+        study_id=str(p.study_id),
+        patient_id=p.patient_id,
+        subject_id=p.subject_id,
+        status=p.status,
+        source=p.source,
+        source_run_id=str(p.source_run_id) if p.source_run_id else None,
+        enrolled_at=p.enrolled_at,
+        notes=p.notes,
+        created_at=p.created_at,
+        updated_at=p.updated_at,
+    )
+
+
+@router.get("/{study_id}/participants")
+def list_participants(
+    study_id: str,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> list[_PResp]:
+    sid = uuid.UUID(study_id)
+    study = db.get(Study, sid)
+    require_access(study, user, db, minimum="viewer")
+    rows = (
+        db.query(_SP)
+        .filter(_SP.study_id == sid)
+        .order_by(_SP.subject_id.asc())
+        .all()
+    )
+    return [_serialize_p(p) for p in rows]
+
+
+@router.post("/{study_id}/participants", response_model=_PResp, status_code=201)
+def create_participant(
+    study_id: str,
+    payload: _PCreate,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> _PResp:
+    sid = uuid.UUID(study_id)
+    study = db.get(Study, sid)
+    require_access(study, user, db, minimum="editor")
+    now = _dt.utcnow()
+    p = _SP(
+        id=uuid.uuid4(),
+        study_id=sid,
+        patient_id=payload.patient_id,
+        subject_id=payload.subject_id,
+        status=payload.status,
+        source="manual",
+        notes=payload.notes,
+        enrolled_at=now if payload.status == "enrolled" else None,
+        enrolled_by=user.id if payload.status == "enrolled" else None,
+    )
+    db.add(p)
+    record_audit(
+        db,
+        user_id=user.id,
+        action="participant_create",
+        object_type="study_participant",
+        object_id=str(p.id),
+        request=request,
+        extra={"study_id": study_id, "subject_id": payload.subject_id, "patient_id": payload.patient_id},
+    )
+    db.commit()
+    db.refresh(p)
+    return _serialize_p(p)
+
+
+@router.post("/{study_id}/participants/promote", response_model=list[_PResp])
+def promote_participants(
+    study_id: str,
+    payload: _PPromote,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> list[_PResp]:
+    sid = uuid.UUID(study_id)
+    study = db.get(Study, sid)
+    require_access(study, user, db, minimum="editor")
+
+    run = db.get(QueryRun, payload.run_id)
+    if run is None or run.study_id != sid:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    prefix = (payload.subject_id_prefix or "P").rstrip("-") + "-"
+    # Existing subject_ids to avoid collisions / duplicates.
+    existing = {
+        p.patient_id: p
+        for p in db.query(_SP).filter(_SP.study_id == sid).all()
+    }
+    next_n = 1 + len(existing)
+
+    out: list[_SP] = []
+    for pid in payload.patient_ids:
+        if pid in existing:
+            out.append(existing[pid])
+            continue
+        subject_id = f"{prefix}{next_n:03d}"
+        next_n += 1
+        p = _SP(
+            id=uuid.uuid4(),
+            study_id=sid,
+            patient_id=pid,
+            subject_id=subject_id,
+            status="screening",
+            source="cohort_promotion",
+            source_run_id=payload.run_id,
+        )
+        db.add(p)
+        out.append(p)
+
+    record_audit(
+        db,
+        user_id=user.id,
+        action="participant_promote",
+        object_type="study_participant",
+        object_id=str(payload.run_id),
+        request=request,
+        extra={"study_id": study_id, "count": len(out), "run_id": str(payload.run_id)},
+    )
+    db.commit()
+    for p in out:
+        db.refresh(p)
+    return [_serialize_p(p) for p in out]
+
+
+@router.patch("/{study_id}/participants/{participant_id}", response_model=_PResp)
+def update_participant(
+    study_id: str,
+    participant_id: str,
+    payload: _PUpdate,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> _PResp:
+    sid = uuid.UUID(study_id)
+    study = db.get(Study, sid)
+    require_access(study, user, db, minimum="editor")
+    p = db.get(_SP, uuid.UUID(participant_id))
+    if p is None or p.study_id != sid:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    if payload.subject_id is not None:
+        p.subject_id = payload.subject_id
+    if payload.status is not None:
+        if payload.status == "enrolled" and p.status != "enrolled":
+            p.enrolled_at = _dt.utcnow()
+            p.enrolled_by = user.id
+        p.status = payload.status
+    if payload.notes is not None:
+        p.notes = payload.notes
+    record_audit(
+        db,
+        user_id=user.id,
+        action="participant_update",
+        object_type="study_participant",
+        object_id=str(p.id),
+        request=request,
+    )
+    db.commit()
+    db.refresh(p)
+    return _serialize_p(p)
+
+
+@router.delete("/{study_id}/participants/{participant_id}")
+def delete_participant(
+    study_id: str,
+    participant_id: str,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    sid = uuid.UUID(study_id)
+    study = db.get(Study, sid)
+    require_access(study, user, db, minimum="editor")
+    p = db.get(_SP, uuid.UUID(participant_id))
+    if p is None or p.study_id != sid:
+        raise HTTPException(status_code=404, detail="Participant not found")
+    pid = str(p.id)
+    db.delete(p)
+    record_audit(
+        db,
+        user_id=user.id,
+        action="participant_delete",
+        object_type="study_participant",
+        object_id=pid,
+        request=request,
+    )
+    db.commit()
+    return {"id": pid, "deleted": True}

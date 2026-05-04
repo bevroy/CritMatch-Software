@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -260,3 +260,187 @@ class FeasibilityResult(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     run: Mapped[FeasibilityRun] = relationship(back_populates="results")
+
+
+# ---------------------------------------------------------------------------
+# EDC (Electronic Data Capture) module
+#
+# Researchers design forms made of typed fields (FHIR Questionnaire-style
+# item types). Patients are enrolled as study participants (manually or
+# promoted from a cohort run). For each (form, participant) pair an
+# ``EdcEntry`` is created; field values can be entered by hand or pulled
+# from the EMR via per-field FHIR mappings. Every value change is recorded
+# in ``EdcEntryFieldHistory`` with a reason-for-change, and a completed
+# entry can carry one or more ``EdcSignature`` rows for 21 CFR Part 11.
+# ---------------------------------------------------------------------------
+
+
+class EdcForm(Base):
+    __tablename__ = "edc_forms"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("studies.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # draft | active | locked
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="draft")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    fields: Mapped[list["EdcField"]] = relationship(
+        back_populates="form",
+        cascade="all, delete-orphan",
+        order_by="EdcField.position",
+    )
+
+
+class EdcField(Base):
+    __tablename__ = "edc_fields"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    form_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("edc_forms.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # stable machine-readable identifier within the form (e.g. "systolic_bp")
+    key: Mapped[str] = mapped_column(Text, nullable=False)
+    label: Mapped[str] = mapped_column(Text, nullable=False)
+    # FHIR Questionnaire item.type: string | text | integer | decimal |
+    # boolean | date | dateTime | time | choice | open-choice | quantity |
+    # attachment | group | display
+    item_type: Mapped[str] = mapped_column(Text, nullable=False, default="string")
+    required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # answerOptions / units / etc.
+    options_json: Mapped[dict | None] = mapped_column(JSONB)
+    # Per-field FHIR mapping. Shape:
+    # {"resource": "Observation", "params": {"code": "8480-6"},
+    #  "extract": "valueQuantity.value", "unit": "mm[Hg]"}
+    fhir_mapping_json: Mapped[dict | None] = mapped_column(JSONB)
+    validation_json: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    form: Mapped[EdcForm] = relationship(back_populates="fields")
+
+
+class StudyParticipant(Base):
+    __tablename__ = "study_participants"
+    __table_args__ = (
+        UniqueConstraint("study_id", "subject_id", name="uq_study_participants_subject"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("studies.id", ondelete="CASCADE"), nullable=False
+    )
+    # FHIR Patient.id on the configured server.
+    patient_id: Mapped[str] = mapped_column(Text, nullable=False)
+    # Study-specific subject identifier shown to coordinators (e.g. "DM-001").
+    subject_id: Mapped[str] = mapped_column(Text, nullable=False)
+    # screening | enrolled | withdrawn | completed
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="screening")
+    # manual | cohort_promotion
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="manual")
+    source_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("query_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    enrolled_at: Mapped[datetime | None] = mapped_column(DateTime)
+    enrolled_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+
+class EdcEntry(Base):
+    __tablename__ = "edc_entries"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    form_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("edc_forms.id", ondelete="CASCADE"), nullable=False
+    )
+    participant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("study_participants.id", ondelete="CASCADE"), nullable=False
+    )
+    # in_progress | complete | locked
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="in_progress")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    field_values: Mapped[list["EdcEntryField"]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan"
+    )
+    signatures: Mapped[list["EdcSignature"]] = relationship(
+        back_populates="entry", cascade="all, delete-orphan"
+    )
+
+
+class EdcEntryField(Base):
+    __tablename__ = "edc_entry_fields"
+    __table_args__ = (
+        UniqueConstraint("entry_id", "field_id", name="uq_edc_entry_fields_entry_field"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    entry_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("edc_entries.id", ondelete="CASCADE"), nullable=False
+    )
+    field_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("edc_fields.id", ondelete="CASCADE"), nullable=False
+    )
+    # Always wrapped: {"value": <native>}
+    value_json: Mapped[dict | None] = mapped_column(JSONB)
+    # manual | fhir_pull
+    source: Mapped[str] = mapped_column(Text, nullable=False, default="manual")
+    fhir_source_ref: Mapped[str | None] = mapped_column(Text)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    entry: Mapped[EdcEntry] = relationship(back_populates="field_values")
+
+
+class EdcEntryFieldHistory(Base):
+    __tablename__ = "edc_entry_field_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    entry_field_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("edc_entry_fields.id", ondelete="CASCADE"), nullable=False
+    )
+    old_value_json: Mapped[dict | None] = mapped_column(JSONB)
+    new_value_json: Mapped[dict | None] = mapped_column(JSONB)
+    old_source: Mapped[str | None] = mapped_column(Text)
+    new_source: Mapped[str | None] = mapped_column(Text)
+    changed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    reason: Mapped[str | None] = mapped_column(Text)
+    changed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class EdcSignature(Base):
+    __tablename__ = "edc_signatures"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    entry_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("edc_entries.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # author | reviewer | approver
+    meaning: Mapped[str] = mapped_column(Text, nullable=False, default="author")
+    # HMAC over (entry snapshot + user + timestamp) using SESSION_SECRET.
+    signature_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    signed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    entry: Mapped[EdcEntry] = relationship(back_populates="signatures")

@@ -661,3 +661,246 @@ export function removeInvestigator(
     method: "DELETE",
   });
 }
+
+/* ── EDC ── */
+
+export type EdcItemType =
+  | "string"
+  | "text"
+  | "integer"
+  | "decimal"
+  | "boolean"
+  | "date"
+  | "dateTime"
+  | "time"
+  | "choice"
+  | "open-choice"
+  | "quantity"
+  | "attachment"
+  | "group"
+  | "display";
+
+export interface EdcFhirMapping {
+  resource: string;
+  params?: Record<string, string>;
+  extract?: string;
+}
+
+export interface EdcField {
+  id: string;
+  position: number;
+  key: string;
+  label: string;
+  item_type: EdcItemType;
+  required: boolean;
+  options_json: Record<string, unknown> | null;
+  fhir_mapping_json: EdcFhirMapping | null;
+  validation_json: Record<string, unknown> | null;
+}
+
+export interface EdcFieldInput {
+  key: string;
+  label: string;
+  item_type?: EdcItemType;
+  position?: number;
+  required?: boolean;
+  options_json?: Record<string, unknown> | null;
+  fhir_mapping_json?: EdcFhirMapping | null;
+  validation_json?: Record<string, unknown> | null;
+}
+
+export interface EdcForm {
+  id: string;
+  study_id: string;
+  name: string;
+  description: string | null;
+  version: number;
+  status: "draft" | "active" | "locked";
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  fields: EdcField[];
+}
+
+export type EdcFormSummary = Omit<EdcForm, "fields" | "created_by" | "created_at"> & {
+  fieldCount: number;
+};
+
+export type ParticipantStatus = "screening" | "enrolled" | "withdrawn" | "completed";
+
+export interface Participant {
+  id: string;
+  study_id: string;
+  patient_id: string;
+  subject_id: string;
+  status: ParticipantStatus;
+  source: "manual" | "cohort_promotion";
+  source_run_id: string | null;
+  enrolled_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntryFieldValue {
+  field_id: string;
+  value: unknown;
+  source: "manual" | "fhir_pull";
+  fhir_source_ref: string | null;
+  updated_at: string | null;
+}
+
+export interface Signature {
+  id: string;
+  user_id: string;
+  meaning: "author" | "reviewer" | "approver";
+  signature_hash: string;
+  signed_at: string;
+}
+
+export interface EdcEntry {
+  id: string;
+  form_id: string;
+  participant_id: string;
+  status: "in_progress" | "complete" | "locked";
+  completed_at: string | null;
+  locked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  values: EntryFieldValue[];
+  signatures: Signature[];
+}
+
+export interface EntryHistoryItem {
+  fieldId: string;
+  fieldKey: string;
+  oldValue: unknown;
+  newValue: unknown;
+  oldSource: string | null;
+  newSource: string | null;
+  changedBy: string | null;
+  reason: string | null;
+  changedAt: string;
+}
+
+export interface FhirPullResult {
+  field_id: string;
+  field_key: string;
+  value: unknown;
+  source_ref: string | null;
+  error: string | null;
+}
+
+/* Forms */
+export function fetchEdcForms(studyId?: string): Promise<EdcFormSummary[]> {
+  const qs = studyId ? `?studyId=${encodeURIComponent(studyId)}` : "";
+  return apiFetch(`/api/edc/forms${qs}`);
+}
+
+export function fetchEdcForm(formId: string): Promise<EdcForm> {
+  return apiFetch(`/api/edc/forms/${formId}`);
+}
+
+export function createEdcForm(payload: {
+  study_id: string;
+  name: string;
+  description?: string;
+  fields?: EdcFieldInput[];
+}): Promise<EdcForm> {
+  return apiFetch(`/api/edc/forms`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateEdcForm(
+  formId: string,
+  payload: Partial<{ name: string; description: string; status: "draft" | "active" | "locked"; fields: EdcFieldInput[] }>,
+): Promise<EdcForm> {
+  return apiFetch(`/api/edc/forms/${formId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function deleteEdcForm(formId: string): Promise<{ id: string; deleted: boolean }> {
+  return apiFetch(`/api/edc/forms/${formId}`, { method: "DELETE" });
+}
+
+/* Participants */
+export function fetchParticipants(studyId: string): Promise<Participant[]> {
+  return apiFetch(`/api/studies/${studyId}/participants`);
+}
+
+export function createParticipant(
+  studyId: string,
+  payload: { patient_id: string; subject_id: string; status?: ParticipantStatus; notes?: string },
+): Promise<Participant> {
+  return apiFetch(`/api/studies/${studyId}/participants`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function promoteParticipants(
+  studyId: string,
+  payload: { run_id: string; patient_ids: string[]; subject_id_prefix?: string },
+): Promise<Participant[]> {
+  return apiFetch(`/api/studies/${studyId}/participants/promote`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateParticipant(
+  studyId: string,
+  participantId: string,
+  payload: Partial<{ subject_id: string; status: ParticipantStatus; notes: string }>,
+): Promise<Participant> {
+  return apiFetch(`/api/studies/${studyId}/participants/${participantId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteParticipant(
+  studyId: string,
+  participantId: string,
+): Promise<{ id: string; deleted: boolean }> {
+  return apiFetch(`/api/studies/${studyId}/participants/${participantId}`, { method: "DELETE" });
+}
+
+/* Entries */
+export function fetchEdcEntries(formId: string): Promise<EdcEntry[]> {
+  return apiFetch(`/api/edc/forms/${formId}/entries`);
+}
+
+export function createEdcEntry(formId: string, participantId: string): Promise<EdcEntry> {
+  return apiFetch(`/api/edc/forms/${formId}/entries`, {
+    method: "POST",
+    body: JSON.stringify({ participant_id: participantId }),
+  });
+}
+
+export function fetchEdcEntry(entryId: string): Promise<EdcEntry> {
+  return apiFetch(`/api/edc/entries/${entryId}`);
+}
+
+export function updateEdcEntry(
+  entryId: string,
+  payload: {
+    values?: Array<{ field_id: string; value: unknown; source?: "manual" | "fhir_pull"; fhir_source_ref?: string | null; reason_for_change?: string }>;
+    status?: "in_progress" | "complete" | "locked";
+  },
+): Promise<EdcEntry> {
+  return apiFetch(`/api/edc/entries/${entryId}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function pullEdcEntry(entryId: string): Promise<FhirPullResult[]> {
+  return apiFetch(`/api/edc/entries/${entryId}/pull`, { method: "POST" });
+}
+
+export function signEdcEntry(
+  entryId: string,
+  payload: { meaning?: "author" | "reviewer" | "approver"; confirmation?: string } = {},
+): Promise<Signature> {
+  return apiFetch(`/api/edc/entries/${entryId}/sign`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function fetchEdcEntryHistory(entryId: string): Promise<EntryHistoryItem[]> {
+  return apiFetch(`/api/edc/entries/${entryId}/history`);
+}

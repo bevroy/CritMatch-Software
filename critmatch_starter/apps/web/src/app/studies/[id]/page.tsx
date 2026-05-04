@@ -18,6 +18,7 @@ import {
 } from "../../../lib/api";
 import SharingPanel from "./SharingPanel";
 import InvestigatorsPanel from "./InvestigatorsPanel";
+import ParticipantsPanel from "./ParticipantsPanel";
 
 function describeError(e: unknown): string {
   if (e instanceof ApiError) {
@@ -196,7 +197,7 @@ export default function StudyDetailPage({ params }: PageParams) {
             <p style={{ color: "#94a3b8", margin: "0.25rem 0 0", fontSize: "0.85rem" }}>{study.id}</p>
           </div>
           <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            <Link href={`/builder?study=${encodeURIComponent(study.id)}`} className="button">
+            <Link href={`/cohort?study=${encodeURIComponent(study.id)}`} className="button">
               Edit Criteria
             </Link>
             <button
@@ -217,7 +218,7 @@ export default function StudyDetailPage({ params }: PageParams) {
         <h2>Criteria Set Versions ({criteriaSets.length})</h2>
         {criteriaSets.length === 0 ? (
           <p style={{ color: "#94a3b8" }}>
-            No criteria sets yet. <Link href={`/builder?study=${encodeURIComponent(study.id)}`} style={{ color: "#1d4ed8" }}>Open the builder</Link> to create one.
+            No criteria sets yet. <Link href={`/cohort?study=${encodeURIComponent(study.id)}`} style={{ color: "#1d4ed8" }}>Open the builder</Link> to create one.
           </p>
         ) : (
           <table>
@@ -384,6 +385,14 @@ export default function StudyDetailPage({ params }: PageParams) {
 
       <SharingPanel studyId={study.id} onOwnerChanged={loadAll} />
       <InvestigatorsPanel
+        studyId={study.id}
+        canManage={
+          study.myAccess === "owner" ||
+          study.myAccess === "editor" ||
+          study.myAccess === "admin"
+        }
+      />
+      <ParticipantsPanel
         studyId={study.id}
         canManage={
           study.myAccess === "owner" ||

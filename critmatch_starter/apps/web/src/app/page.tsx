@@ -15,13 +15,21 @@ export default function HomePage() {
           <h2>Studies</h2>
           <p>Manage saved study definitions and cohort workspaces.</p>
         </Link>
-        <Link className="card" href="/builder">
-          <h2>Criteria Builder</h2>
+        <Link className="card" href="/cohort">
+          <h2>Cohort Builder</h2>
           <p>Define inclusion and exclusion rules with terminology expansion.</p>
         </Link>
         <Link className="card" href="/results">
           <h2>Results</h2>
           <p>Review, filter, and export candidate patient cohorts.</p>
+        </Link>
+        <Link className="card" href="/feasibility">
+          <h2>Feasibility</h2>
+          <p>Answer trial feasibility questionnaires from EMR data.</p>
+        </Link>
+        <Link className="card" href="/edc">
+          <h2>EDC</h2>
+          <p>Build study forms, identify participants, and pull data points from the EMR.</p>
         </Link>
       </div>
     </main>

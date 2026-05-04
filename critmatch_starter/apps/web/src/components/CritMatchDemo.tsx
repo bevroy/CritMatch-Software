@@ -130,7 +130,7 @@ export default function CritMatchDemo() {
 
         <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
           <section className="rounded-3xl border border-[#e5e7eb] bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-[#041E42]">Trial Criteria Builder</h2>
+            <h2 className="mb-4 text-xl font-semibold text-[#041E42]">Cohort Builder</h2>
             <div className="space-y-4">
               <label className="block text-sm font-medium">Trial name<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={trialName} onChange={(e) => setTrialName(e.target.value)} /></label>
               <div className="grid grid-cols-2 gap-3">
