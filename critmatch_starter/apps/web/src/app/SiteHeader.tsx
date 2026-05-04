@@ -85,17 +85,13 @@ export default function SiteHeader() {
         <div className="site-header-inner">
           <Link href="/" className="brand">
             <Image
-              src="/critmatch-logo.png"
-              alt="CritMatch logo"
-              width={552}
-              height={138}
+              src="/critmatch-logo-mark.png"
+              alt="CritMatch — Smarter Matches. Better Trials. Real Impact."
+              width={216}
+              height={110}
               priority
               className="brand-logo"
             />
-            <span style={{ display: "flex", flexDirection: "column" }}>
-              <span className="brand-name">CritMatch</span>
-              <span className="brand-tagline">EHR Cohort Identification</span>
-            </span>
           </Link>
           <div className="session-controls">
             {loaded && session ? (

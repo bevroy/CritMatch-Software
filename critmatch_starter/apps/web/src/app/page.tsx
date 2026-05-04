@@ -1,22 +1,40 @@
 import Link from "next/link";
+import Image from "next/image";
 
 export default function HomePage() {
   return (
     <main className="container">
-      <section className="hero">
-        <div className="hero-tagline">EHR Cohort Identification Platform</div>
-        <h1>Match the right patients to the right trials.</h1>
-        <p className="lead">
-          CritMatch turns EMR data into clinical-trial cohorts — define studies,
-          run feasibility, capture EDC data points, and manage trial finances in one place.
+      {/* Brand hero — large centered logo on the mint background, no card */}
+      <section className="brand-hero">
+        <Image
+          src="/critmatch-logo-mark.png"
+          alt="CritMatch"
+          width={216}
+          height={110}
+          priority
+          className="brand-hero-logo"
+        />
+        <div className="brand-hero-tagline">
+          Smarter Matches. Better Trials. Real Impact.
+        </div>
+      </section>
+
+      {/* Primary CTA card */}
+      <section className="card hero-card">
+        <h2>Start Cohort Discovery</h2>
+        <p className="hero-card-lead">
+          Define inclusion and exclusion criteria, expand them with terminology
+          services, and run them against the EHR to surface candidate participants
+          for your trial.
         </p>
-        <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
+        <div className="hero-card-actions">
           <Link href="/cohort" className="button">🧩 Build a Cohort</Link>
           <Link href="/studies" className="button-secondary">📋 View Studies</Link>
         </div>
       </section>
 
-      <div className="grid grid-3" style={{ marginTop: "1.5rem" }}>
+      {/* Feature tiles */}
+      <div className="grid grid-3" style={{ marginTop: "1.25rem" }}>
         <Link className="card" href="/studies">
           <h2>📋 Studies</h2>
           <p>Manage saved study definitions and cohort workspaces.</p>
