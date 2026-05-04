@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from app.db.models import CriteriaSet, QueryRun, Study, StudyCollaborator, User
+from app.db.models import CriteriaSet, QueryRun, Study, StudyCollaborator, StudyInvestigator, User
 from app.db.session import get_db
 from app.deps.auth import CurrentUser
 from app.schemas.studies import CriteriaSetCreate, StudyCreate, StudyResponse
@@ -454,3 +454,197 @@ def search_users(
         }
         for u in rows
     ]
+
+# ---------------------------------------------------------------------------
+# Investigators (PI / Sub-I)
+# ---------------------------------------------------------------------------
+
+
+_VALID_INVESTIGATOR_ROLES = {"principal_investigator", "sub_investigator"}
+
+
+class InvestigatorCreate(BaseModel):
+    practitioner_id: str
+    name: str | None = None
+    npi: str | None = None
+    role: str = "sub_investigator"
+
+
+class InvestigatorUpdate(BaseModel):
+    name: str | None = None
+    npi: str | None = None
+    role: str | None = None
+
+
+@router.get("/{study_id}/investigators")
+def list_investigators(
+    study_id: str,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    study = _study_for(db, study_id, user)
+    rows = (
+        db.query(StudyInvestigator)
+        .filter(StudyInvestigator.study_id == study.id)
+        .order_by(StudyInvestigator.created_at.asc())
+        .all()
+    )
+    return {
+        "studyId": str(study.id),
+        "items": [
+            {
+                "id": str(r.id),
+                "practitionerId": r.practitioner_id,
+                "name": r.name,
+                "npi": r.npi,
+                "role": r.role,
+                "createdAt": r.created_at.isoformat(),
+            }
+            for r in rows
+        ],
+    }
+
+
+@router.post("/{study_id}/investigators")
+def add_investigator(
+    study_id: str,
+    payload: InvestigatorCreate,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    study = _study_for(db, study_id, user, minimum="editor")
+    if payload.role not in _VALID_INVESTIGATOR_ROLES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Role must be one of {sorted(_VALID_INVESTIGATOR_ROLES)}",
+        )
+    if not payload.practitioner_id.strip():
+        raise HTTPException(status_code=400, detail="practitioner_id required")
+
+    existing = (
+        db.query(StudyInvestigator)
+        .filter(
+            StudyInvestigator.study_id == study.id,
+            StudyInvestigator.practitioner_id == payload.practitioner_id,
+        )
+        .first()
+    )
+    if existing:
+        existing.role = payload.role
+        if payload.name is not None:
+            existing.name = payload.name
+        if payload.npi is not None:
+            existing.npi = payload.npi
+        action = "study_investigator_update"
+        inv = existing
+    else:
+        inv = StudyInvestigator(
+            study_id=study.id,
+            practitioner_id=payload.practitioner_id,
+            name=payload.name,
+            npi=payload.npi,
+            role=payload.role,
+        )
+        db.add(inv)
+        db.flush()
+        action = "study_investigator_add"
+
+    record_audit(
+        db,
+        user_id=user.id,
+        action=action,
+        object_type="study",
+        object_id=str(study.id),
+        request=request,
+        extra={"practitioner_id": payload.practitioner_id, "role": payload.role},
+    )
+    db.commit()
+    return {
+        "id": str(inv.id),
+        "studyId": str(study.id),
+        "practitionerId": inv.practitioner_id,
+        "name": inv.name,
+        "npi": inv.npi,
+        "role": inv.role,
+    }
+
+
+@router.patch("/{study_id}/investigators/{investigator_id}")
+def update_investigator(
+    study_id: str,
+    investigator_id: str,
+    payload: InvestigatorUpdate,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    study = _study_for(db, study_id, user, minimum="editor")
+    try:
+        inv_uuid = uuid.UUID(investigator_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid investigator id") from exc
+    inv = db.get(StudyInvestigator, inv_uuid)
+    if inv is None or inv.study_id != study.id:
+        raise HTTPException(status_code=404, detail="Investigator not found")
+
+    if payload.role is not None:
+        if payload.role not in _VALID_INVESTIGATOR_ROLES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Role must be one of {sorted(_VALID_INVESTIGATOR_ROLES)}",
+            )
+        inv.role = payload.role
+    if payload.name is not None:
+        inv.name = payload.name
+    if payload.npi is not None:
+        inv.npi = payload.npi
+
+    record_audit(
+        db,
+        user_id=user.id,
+        action="study_investigator_update",
+        object_type="study",
+        object_id=str(study.id),
+        request=request,
+        extra={"investigator_id": str(inv.id)},
+    )
+    db.commit()
+    return {
+        "id": str(inv.id),
+        "studyId": str(study.id),
+        "practitionerId": inv.practitioner_id,
+        "name": inv.name,
+        "npi": inv.npi,
+        "role": inv.role,
+    }
+
+
+@router.delete("/{study_id}/investigators/{investigator_id}")
+def remove_investigator(
+    study_id: str,
+    investigator_id: str,
+    request: Request,
+    user: CurrentUser,
+    db: Session = Depends(get_db),
+) -> dict:
+    study = _study_for(db, study_id, user, minimum="editor")
+    try:
+        inv_uuid = uuid.UUID(investigator_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid investigator id") from exc
+    inv = db.get(StudyInvestigator, inv_uuid)
+    if inv is None or inv.study_id != study.id:
+        raise HTTPException(status_code=404, detail="Investigator not found")
+    db.delete(inv)
+    record_audit(
+        db,
+        user_id=user.id,
+        action="study_investigator_remove",
+        object_type="study",
+        object_id=str(study.id),
+        request=request,
+        extra={"investigator_id": str(inv_uuid)},
+    )
+    db.commit()
+    return {"id": str(inv_uuid), "removed": True}

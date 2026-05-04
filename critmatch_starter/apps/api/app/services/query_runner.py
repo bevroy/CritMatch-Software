@@ -211,6 +211,18 @@ def run_query(db: Session, run_id: str, *, fhir_client: FHIRClient | None = None
             owns_client = True
         try:
             matches = QueryExecutor(client).execute(cs.logic_json or {})
+
+            # Restrict to patients seen by the study's PI / Sub-Investigators,
+            # if any are configured. None means "no restriction".
+            from app.services.investigators import (
+                allowed_patient_ids,
+                list_practitioner_refs,
+            )
+
+            practitioner_refs = list_practitioner_refs(db, qr.study_id)
+            allowed = allowed_patient_ids(client, practitioner_refs)
+            if allowed is not None:
+                matches = {pid: rules for pid, rules in matches.items() if pid in allowed}
         finally:
             if owns_client:
                 client.close()

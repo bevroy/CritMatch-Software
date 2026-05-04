@@ -471,3 +471,187 @@ export function markNotificationRead(id: string): Promise<{ ok: true }> {
 export function markAllNotificationsRead(): Promise<{ ok: true; marked: number }> {
   return apiFetch("/api/notifications/read-all", { method: "POST" });
 }
+
+/* ── Feasibility ── */
+
+export type FeasibilityRuleKind = "condition" | "observation" | "demographic";
+
+export interface FeasibilityRule {
+  id?: string;
+  kind: FeasibilityRuleKind;
+  label?: string;
+  codes?: RuleCode[];
+  field?: string;
+  op?: string;
+  value?: string | number;
+}
+
+export interface FeasibilityLogic {
+  operator: "AND" | "OR";
+  rules: FeasibilityRule[];
+}
+
+export interface FeasibilityQuestionInput {
+  text: string;
+  logic_json: FeasibilityLogic;
+  position?: number;
+}
+
+export interface FeasibilityQuestion {
+  id: string;
+  position: number;
+  text: string;
+  logicJson: FeasibilityLogic;
+}
+
+export interface FeasibilityQuestionnaire {
+  id: string;
+  name: string;
+  description: string | null;
+  studyId: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  questions: FeasibilityQuestion[];
+}
+
+export interface FeasibilityQuestionnaireSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  studyId: string | null;
+  questionCount: number;
+  updatedAt: string;
+}
+
+export interface FeasibilityResultItem {
+  questionId: string;
+  questionText: string;
+  count: number;
+  detail: Record<string, unknown> | null;
+}
+
+export interface FeasibilityRun {
+  id: string;
+  questionnaireId: string;
+  status: string;
+  totalPatients: number | null;
+  executionMs: number | null;
+  errorMessage: string | null;
+  createdAt: string;
+  results: FeasibilityResultItem[];
+}
+
+export function fetchFeasibilityQuestionnaires(
+  studyId?: string,
+): Promise<FeasibilityQuestionnaireSummary[]> {
+  const qs = new URLSearchParams();
+  if (studyId) qs.set("studyId", studyId);
+  const tail = qs.toString();
+  return apiFetch(`/api/feasibility/questionnaires${tail ? `?${tail}` : ""}`);
+}
+
+export function fetchFeasibilityQuestionnaire(id: string): Promise<FeasibilityQuestionnaire> {
+  return apiFetch(`/api/feasibility/questionnaires/${id}`);
+}
+
+export function createFeasibilityQuestionnaire(payload: {
+  name: string;
+  description?: string;
+  studyId?: string;
+  questions: FeasibilityQuestionInput[];
+}): Promise<FeasibilityQuestionnaire> {
+  return apiFetch("/api/feasibility/questionnaires", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateFeasibilityQuestionnaire(
+  id: string,
+  payload: Partial<{
+    name: string;
+    description: string;
+    studyId: string | null;
+    questions: FeasibilityQuestionInput[];
+  }>,
+): Promise<FeasibilityQuestionnaire> {
+  return apiFetch(`/api/feasibility/questionnaires/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function deleteFeasibilityQuestionnaire(id: string): Promise<{ id: string; deleted: boolean }> {
+  return apiFetch(`/api/feasibility/questionnaires/${id}`, { method: "DELETE" });
+}
+
+export function runFeasibility(id: string): Promise<FeasibilityRun> {
+  return apiFetch(`/api/feasibility/questionnaires/${id}/run`, { method: "POST" });
+}
+
+export function fetchFeasibilityRun(runId: string): Promise<FeasibilityRun> {
+  return apiFetch(`/api/feasibility/runs/${runId}`);
+}
+
+export function fetchFeasibilityRuns(questionnaireId: string, limit = 25): Promise<FeasibilityRun[]> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  return apiFetch(`/api/feasibility/questionnaires/${questionnaireId}/runs?${qs.toString()}`);
+}
+
+/* ── Investigators (PI / Sub-I) ── */
+
+export type InvestigatorRole = "principal_investigator" | "sub_investigator";
+
+export interface Investigator {
+  id: string;
+  practitionerId: string;
+  name: string | null;
+  npi: string | null;
+  role: InvestigatorRole;
+  createdAt: string;
+}
+
+export interface InvestigatorList {
+  studyId: string;
+  items: Investigator[];
+}
+
+export function fetchInvestigators(studyId: string): Promise<InvestigatorList> {
+  return apiFetch(`/api/studies/${studyId}/investigators`);
+}
+
+export function addInvestigator(
+  studyId: string,
+  payload: {
+    practitioner_id: string;
+    name?: string;
+    npi?: string;
+    role: InvestigatorRole;
+  },
+): Promise<Investigator> {
+  return apiFetch(`/api/studies/${studyId}/investigators`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateInvestigator(
+  studyId: string,
+  investigatorId: string,
+  payload: Partial<{ name: string; npi: string; role: InvestigatorRole }>,
+): Promise<Investigator> {
+  return apiFetch(`/api/studies/${studyId}/investigators/${investigatorId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function removeInvestigator(
+  studyId: string,
+  investigatorId: string,
+): Promise<{ id: string; removed: boolean }> {
+  return apiFetch(`/api/studies/${studyId}/investigators/${investigatorId}`, {
+    method: "DELETE",
+  });
+}

@@ -2,7 +2,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
-from app.routes import audit, auth, fhir, notifications, query, runs, studies, terminology
+from app.routes import (
+    audit,
+    auth,
+    feasibility,
+    fhir,
+    notifications,
+    query,
+    runs,
+    studies,
+    terminology,
+)
 from app.sentry_setup import init_sentry
 
 init_sentry()
@@ -26,6 +36,7 @@ app.include_router(runs.router, prefix="/api/runs", tags=["runs"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(fhir.router, prefix="/api/fhir", tags=["fhir"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(feasibility.router, prefix="/api/feasibility", tags=["feasibility"])
 
 
 @app.get("/health")

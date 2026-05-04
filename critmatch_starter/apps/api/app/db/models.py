@@ -61,6 +61,33 @@ class StudyCollaborator(Base):
     user: Mapped[User] = relationship()
 
 
+class StudyInvestigator(Base):
+    """A PI or Sub-Investigator participating in a study.
+
+    ``practitioner_id`` is the FHIR ``Practitioner`` resource id on the
+    configured server. The matching/feasibility engines use this set to
+    optionally restrict cohort searches to patients seen by these providers
+    (typically by walking ``Encounter.participant`` references).
+    """
+
+    __tablename__ = "study_investigators"
+    __table_args__ = (UniqueConstraint("study_id", "practitioner_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("studies.id", ondelete="CASCADE"), nullable=False
+    )
+    practitioner_id: Mapped[str] = mapped_column(Text, nullable=False)
+    name: Mapped[str | None] = mapped_column(Text)
+    npi: Mapped[str | None] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(Text, nullable=False, default="sub_investigator")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+    study: Mapped[Study] = relationship()
+
+
 class CriteriaSet(Base):
     __tablename__ = "criteria_sets"
     __table_args__ = (UniqueConstraint("study_id", "version"),)
@@ -141,3 +168,95 @@ class Notification(Base):
     metadata_json: Mapped[dict | None] = mapped_column(JSONB)
     read_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Feasibility module
+#
+# A feasibility "questionnaire" is a collection of questions a researcher
+# would typically answer on a study feasibility form (e.g. "How many adult
+# patients with type 2 diabetes do you see per year?"). Each question is
+# evaluated against the EMR via FHIR and produces an aggregate count — the
+# module deliberately does NOT persist patient ids, since feasibility is an
+# aggregate workflow and aggregate-only avoids new PHI surface area.
+# ---------------------------------------------------------------------------
+
+
+class FeasibilityQuestionnaire(Base):
+    __tablename__ = "feasibility_questionnaires"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("studies.id", ondelete="CASCADE"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    questions: Mapped[list["FeasibilityQuestion"]] = relationship(
+        back_populates="questionnaire",
+        cascade="all, delete-orphan",
+        order_by="FeasibilityQuestion.position",
+    )
+    runs: Mapped[list["FeasibilityRun"]] = relationship(
+        back_populates="questionnaire", cascade="all, delete-orphan"
+    )
+
+
+class FeasibilityQuestion(Base):
+    __tablename__ = "feasibility_questions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    questionnaire_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("feasibility_questionnaires.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    # logic_json shape mirrors a CriteriaSet but at single-question granularity:
+    # {"operator": "AND", "rules": [...]}  (rules.kind in condition|observation|
+    # medication|demographic). See services/feasibility_engine.py.
+    logic_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    questionnaire: Mapped[FeasibilityQuestionnaire] = relationship(back_populates="questions")
+
+
+class FeasibilityRun(Base):
+    __tablename__ = "feasibility_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    questionnaire_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("feasibility_questionnaires.id", ondelete="CASCADE"), nullable=False
+    )
+    run_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="queued")
+    total_patients: Mapped[int | None] = mapped_column(Integer)
+    execution_ms: Mapped[int | None] = mapped_column(Integer)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    questionnaire: Mapped[FeasibilityQuestionnaire] = relationship(back_populates="runs")
+    results: Mapped[list["FeasibilityResult"]] = relationship(
+        back_populates="run", cascade="all, delete-orphan"
+    )
+
+
+class FeasibilityResult(Base):
+    __tablename__ = "feasibility_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("feasibility_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("feasibility_questions.id", ondelete="CASCADE"), nullable=False
+    )
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    detail_json: Mapped[dict | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    run: Mapped[FeasibilityRun] = relationship(back_populates="results")

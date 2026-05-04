@@ -17,6 +17,7 @@ import {
   type Study,
 } from "../../../lib/api";
 import SharingPanel from "./SharingPanel";
+import InvestigatorsPanel from "./InvestigatorsPanel";
 
 function describeError(e: unknown): string {
   if (e instanceof ApiError) {
@@ -382,6 +383,14 @@ export default function StudyDetailPage({ params }: PageParams) {
       </section>
 
       <SharingPanel studyId={study.id} onOwnerChanged={loadAll} />
+      <InvestigatorsPanel
+        studyId={study.id}
+        canManage={
+          study.myAccess === "owner" ||
+          study.myAccess === "editor" ||
+          study.myAccess === "admin"
+        }
+      />
     </main>
   );
 }
