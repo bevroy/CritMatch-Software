@@ -32,7 +32,7 @@ export default function SiteHeader() {
   const [loaded, setLoaded] = useState(false);
   const [devAvailable, setDevAvailable] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
-  const [navOpen, setNavOpen] = useState(true);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     getMe()
@@ -153,8 +153,11 @@ export default function SiteHeader() {
             onClick={() => setNavOpen((o) => !o)}
             aria-expanded={navOpen}
           >
-            <span className="nav-toggle-icon">{navOpen ? "≡" : "≡"}</span>
+            <span className="nav-toggle-icon">≡</span>
             <span>Navigation</span>
+            <span style={{ marginLeft: "auto", fontSize: "0.85rem", opacity: 0.7 }}>
+              {navOpen ? "▲" : "▼"}
+            </span>
           </button>
           {navOpen && (
             <div className="nav-tiles">
