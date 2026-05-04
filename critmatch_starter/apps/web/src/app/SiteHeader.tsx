@@ -38,7 +38,7 @@ const PAGE_INFO: Record<string, PageInfo> = {
   "/launch": { title: "Sign In", subtitle: "Authenticate to access CritMatch." },
   "/auth": { title: "Authentication", subtitle: "Completing sign in…" },
   "/builder": { title: "Cohort Builder", subtitle: "Define inclusion and exclusion rules with terminology expansion." },
-  "/demo": { title: "Demo", subtitle: "Interactive walkthrough of the matching engine." },
+  "/demo": { title: "Live Demo", subtitle: "Try the CritMatch matching engine on bundled sample patients — no sign-in required." },
 };
 
 function getPageInfo(pathname: string): PageInfo | null {

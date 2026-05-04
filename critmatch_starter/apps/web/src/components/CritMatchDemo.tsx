@@ -1,72 +1,84 @@
-'use client';
+"use client";
 
-import { useMemo, useState } from 'react';
-import { runMatch } from '../lib/critmatch-api';
-import type { MatchRequest, MatchResponse, PatientMatch } from '../lib/critmatch-types';
-
-const defaultRequest: MatchRequest = {
-  trial_name: 'Heart Failure + Diabetes Trial',
-  inclusion: {
-    age_min: 18,
-    age_max: 75,
-    diagnoses: ['heart failure'],
-    medications: [],
-    icd10: [],
-    labs: [{ name: 'HbA1c', operator: '>', value: 8 }],
-  },
-  exclusion: {
-    diagnoses: ['stroke'],
-    medications: ['warfarin'],
-    conditions: ['pregnancy'],
-    icd10: [],
-    labs: [{ name: 'eGFR', operator: '<', value: 30 }],
-  },
-};
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { runMatchLocal, DEMO_PRESETS, SAMPLE_PATIENTS } from "../lib/critmatch-mock";
+import type { MatchRequest, MatchResponse, PatientMatch } from "../lib/critmatch-types";
 
 function splitCsv(value: string): string[] {
-  return value.split(',').map((item) => item.trim()).filter(Boolean);
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
 }
 
-function Badge({ children, tone }: { children: React.ReactNode; tone: string }) {
-  const base = 'inline-flex rounded-full px-3 py-1 text-xs font-semibold';
-  const styles: Record<string, string> = {
-    High: 'bg-emerald-100 text-emerald-800',
-    Moderate: 'bg-amber-100 text-amber-900',
-    Low: 'bg-[#eef3f4] text-[#041E42]',
-    Excluded: 'bg-red-100 text-red-800',
-  };
-  return <span className={`${base} ${styles[tone] || styles.Low}`}>{children}</span>;
+const CONFIDENCE_BG: Record<PatientMatch["confidence"], string> = {
+  High: "#d8efe0",
+  Moderate: "#fef3c7",
+  Low: "#e2e8f0",
+  Excluded: "#fee2e2",
+};
+const CONFIDENCE_FG: Record<PatientMatch["confidence"], string> = {
+  High: "#0f3a3a",
+  Moderate: "#92400e",
+  Low: "#475569",
+  Excluded: "#991b1b",
+};
+
+function ConfidenceBadge({ tone }: { tone: PatientMatch["confidence"] }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "0.25rem 0.7rem",
+        borderRadius: "999px",
+        background: CONFIDENCE_BG[tone],
+        color: CONFIDENCE_FG[tone],
+        fontWeight: 700,
+        fontSize: "0.78rem",
+        textTransform: "uppercase",
+        letterSpacing: "0.04em",
+      }}
+    >
+      {tone}
+    </span>
+  );
+}
+
+function Bullets({ items, fallback }: { items: string[]; fallback: string }) {
+  const data = items.length ? items : [fallback];
+  return (
+    <ul style={{ margin: "0.25rem 0 0", paddingLeft: "1.1rem", fontSize: "0.88rem", color: "var(--cm-text)" }}>
+      {data.map((it, i) => (
+        <li key={i}>{it}</li>
+      ))}
+    </ul>
+  );
 }
 
 function PatientCard({ match }: { match: PatientMatch }) {
   return (
-    <div className="rounded-2xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
-      <div className="mb-3 flex items-center justify-between gap-3">
+    <div className="card" style={{ marginTop: "0.85rem" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", marginBottom: "0.65rem" }}>
         <div>
-          <h3 className="text-lg font-semibold text-[#041E42]">{match.patient_id}</h3>
-          <p className="text-sm text-[#6b7280]">Age {match.age ?? '—'} · {match.sex ?? '—'}</p>
+          <h3 style={{ margin: 0, fontSize: "1.1rem", color: "var(--cm-teal)" }}>{match.patient_id}</h3>
+          <p style={{ margin: "0.15rem 0 0", color: "var(--cm-muted)", fontSize: "0.85rem" }}>
+            Age {match.age ?? "\u2014"} \u00b7 {match.sex ?? "\u2014"}
+          </p>
         </div>
-        <Badge tone={match.confidence}>{match.confidence}</Badge>
+        <ConfidenceBadge tone={match.confidence} />
       </div>
-      <p className="mb-3 text-sm text-[#1f2937]">{match.recommendation}</p>
-      <div className="grid gap-3 md:grid-cols-3">
+      <p style={{ margin: "0 0 0.85rem", fontSize: "0.92rem", color: "var(--cm-text)" }}>{match.recommendation}</p>
+      <div style={{ display: "grid", gap: "0.85rem", gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Matched</p>
-          <ul className="mt-1 list-disc pl-4 text-sm text-[#1f2937]">
-            {(match.matched_criteria.length ? match.matched_criteria : ['None']).map((item, idx) => <li key={idx}>{item}</li>)}
-          </ul>
+          <p style={{ margin: 0, fontSize: "0.7rem", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700, color: "var(--cm-teal-3)" }}>Matched</p>
+          <Bullets items={match.matched_criteria} fallback="None" />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Exclusions</p>
-          <ul className="mt-1 list-disc pl-4 text-sm text-[#1f2937]">
-            {(match.exclusion_flags.length ? match.exclusion_flags : ['None']).map((item, idx) => <li key={idx}>{item}</li>)}
-          </ul>
+          <p style={{ margin: 0, fontSize: "0.7rem", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700, color: "var(--cm-teal-3)" }}>Exclusions</p>
+          <Bullets items={match.exclusion_flags} fallback="None" />
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6b7280]">Missing / unresolved</p>
-          <ul className="mt-1 list-disc pl-4 text-sm text-[#1f2937]">
-            {(match.missing_data.length ? match.missing_data : ['None']).map((item, idx) => <li key={idx}>{item}</li>)}
-          </ul>
+          <p style={{ margin: 0, fontSize: "0.7rem", letterSpacing: "0.06em", textTransform: "uppercase", fontWeight: 700, color: "var(--cm-teal-3)" }}>Missing / unresolved</p>
+          <Bullets items={match.missing_data} fallback="None" />
         </div>
       </div>
     </div>
@@ -74,88 +86,191 @@ function PatientCard({ match }: { match: PatientMatch }) {
 }
 
 export default function CritMatchDemo() {
-  const [trialName, setTrialName] = useState(defaultRequest.trial_name);
-  const [ageMin, setAgeMin] = useState(defaultRequest.inclusion.age_min?.toString() ?? '');
-  const [ageMax, setAgeMax] = useState(defaultRequest.inclusion.age_max?.toString() ?? '');
-  const [inclusionDx, setInclusionDx] = useState(defaultRequest.inclusion.diagnoses.join(', '));
-  const [exclusionDx, setExclusionDx] = useState(defaultRequest.exclusion.diagnoses.join(', '));
-  const [exclusionMeds, setExclusionMeds] = useState(defaultRequest.exclusion.medications.join(', '));
-  const [exclusionConditions, setExclusionConditions] = useState(defaultRequest.exclusion.conditions.join(', '));
-  const [hba1c, setHba1c] = useState('8');
-  const [egfr, setEgfr] = useState('30');
+  const [activePreset, setActivePreset] = useState<string>(DEMO_PRESETS[0].id);
+  const initial = DEMO_PRESETS[0].request;
+
+  const [trialName, setTrialName] = useState(initial.trial_name);
+  const [ageMin, setAgeMin] = useState(initial.inclusion.age_min?.toString() ?? "");
+  const [ageMax, setAgeMax] = useState(initial.inclusion.age_max?.toString() ?? "");
+  const [inclusionDx, setInclusionDx] = useState(initial.inclusion.diagnoses.join(", "));
+  const [exclusionDx, setExclusionDx] = useState(initial.exclusion.diagnoses.join(", "));
+  const [exclusionMeds, setExclusionMeds] = useState(initial.exclusion.medications.join(", "));
+  const [exclusionConditions, setExclusionConditions] = useState(initial.exclusion.conditions.join(", "));
+  const [hba1c, setHba1c] = useState(initial.inclusion.labs[0]?.value?.toString() ?? "");
+  const [egfr, setEgfr] = useState(initial.exclusion.labs[0]?.value?.toString() ?? "");
   const [result, setResult] = useState<MatchResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showFilter, setShowFilter] = useState<"all" | "candidates">("all");
 
-  const request = useMemo<MatchRequest>(() => ({
-    trial_name: trialName,
-    inclusion: {
-      age_min: ageMin ? Number(ageMin) : undefined,
-      age_max: ageMax ? Number(ageMax) : undefined,
-      diagnoses: splitCsv(inclusionDx),
-      medications: [],
-      icd10: [],
-      labs: hba1c ? [{ name: 'HbA1c', operator: '>', value: Number(hba1c) }] : [],
-    },
-    exclusion: {
-      diagnoses: splitCsv(exclusionDx),
-      medications: splitCsv(exclusionMeds),
-      conditions: splitCsv(exclusionConditions),
-      icd10: [],
-      labs: egfr ? [{ name: 'eGFR', operator: '<', value: Number(egfr) }] : [],
-    },
-  }), [trialName, ageMin, ageMax, inclusionDx, exclusionDx, exclusionMeds, exclusionConditions, hba1c, egfr]);
-
-  async function handleRun() {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await runMatch(request);
-      setResult(response);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-    } finally {
-      setLoading(false);
-    }
+  function applyPreset(id: string) {
+    const preset = DEMO_PRESETS.find((p) => p.id === id);
+    if (!preset) return;
+    setActivePreset(id);
+    const r = preset.request;
+    setTrialName(r.trial_name);
+    setAgeMin(r.inclusion.age_min?.toString() ?? "");
+    setAgeMax(r.inclusion.age_max?.toString() ?? "");
+    setInclusionDx(r.inclusion.diagnoses.join(", "));
+    setExclusionDx(r.exclusion.diagnoses.join(", "));
+    setExclusionMeds(r.exclusion.medications.join(", "));
+    setExclusionConditions(r.exclusion.conditions.join(", "));
+    setHba1c(r.inclusion.labs[0]?.value?.toString() ?? "");
+    setEgfr(r.exclusion.labs[0]?.value?.toString() ?? "");
+    setResult(null);
   }
 
+  const request = useMemo<MatchRequest>(
+    () => ({
+      trial_name: trialName,
+      inclusion: {
+        age_min: ageMin ? Number(ageMin) : undefined,
+        age_max: ageMax ? Number(ageMax) : undefined,
+        diagnoses: splitCsv(inclusionDx),
+        medications: [],
+        icd10: [],
+        labs: hba1c ? [{ name: "HbA1c", operator: ">", value: Number(hba1c) }] : [],
+      },
+      exclusion: {
+        diagnoses: splitCsv(exclusionDx),
+        medications: splitCsv(exclusionMeds),
+        conditions: splitCsv(exclusionConditions),
+        icd10: [],
+        labs: egfr ? [{ name: "eGFR", operator: "<", value: Number(egfr) }] : [],
+      },
+    }),
+    [trialName, ageMin, ageMax, inclusionDx, exclusionDx, exclusionMeds, exclusionConditions, hba1c, egfr],
+  );
+
+  function handleRun() {
+    setResult(runMatchLocal(request));
+  }
+
+  const visibleMatches = useMemo(() => {
+    if (!result) return [] as PatientMatch[];
+    if (showFilter === "candidates") {
+      return result.matches.filter((m) => m.confidence === "High" || m.confidence === "Moderate");
+    }
+    return result.matches;
+  }, [result, showFilter]);
+
+  const counts = useMemo(() => {
+    const base = { High: 0, Moderate: 0, Low: 0, Excluded: 0 };
+    if (!result) return base;
+    for (const m of result.matches) base[m.confidence] += 1;
+    return base;
+  }, [result]);
+
   return (
-    <main className="min-h-screen bg-[#f4f6f7] px-6 py-8 text-[#041E42]">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-8 rounded-3xl bg-[#041E42] p-8 text-white shadow-sm">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.28em] text-white/70">Elionyx Health · CritMatch</p>
-          <h1 className="text-4xl font-bold tracking-tight">Clinical trial matching infrastructure</h1>
-          <p className="mt-3 max-w-3xl text-white/75">Screen structured trial criteria against sample patient records and surface likely matches, exclusions, and missing data for coordinator review.</p>
-        </header>
-
-        <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-          <section className="rounded-3xl border border-[#e5e7eb] bg-white p-6 shadow-sm">
-            <h2 className="mb-4 text-xl font-semibold text-[#041E42]">Cohort Builder</h2>
-            <div className="space-y-4">
-              <label className="block text-sm font-medium">Trial name<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={trialName} onChange={(e) => setTrialName(e.target.value)} /></label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block text-sm font-medium">Age min<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={ageMin} onChange={(e) => setAgeMin(e.target.value)} /></label>
-                <label className="block text-sm font-medium">Age max<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={ageMax} onChange={(e) => setAgeMax(e.target.value)} /></label>
-              </div>
-              <label className="block text-sm font-medium">Required diagnoses<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={inclusionDx} onChange={(e) => setInclusionDx(e.target.value)} /></label>
-              <label className="block text-sm font-medium">HbA1c greater than<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={hba1c} onChange={(e) => setHba1c(e.target.value)} /></label>
-              <label className="block text-sm font-medium">Excluded diagnoses<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={exclusionDx} onChange={(e) => setExclusionDx(e.target.value)} /></label>
-              <label className="block text-sm font-medium">Excluded medications<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={exclusionMeds} onChange={(e) => setExclusionMeds(e.target.value)} /></label>
-              <label className="block text-sm font-medium">Excluded conditions<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={exclusionConditions} onChange={(e) => setExclusionConditions(e.target.value)} /></label>
-              <label className="block text-sm font-medium">Exclude eGFR less than<input className="mt-1 w-full rounded-xl border border-[#e5e7eb] bg-white px-3 py-2 focus:border-[#041E42] focus:outline-none focus:ring-2 focus:ring-[#041E42]/20" value={egfr} onChange={(e) => setEgfr(e.target.value)} /></label>
-              <button onClick={handleRun} disabled={loading} className="w-full rounded-xl bg-[#041E42] px-4 py-3 font-semibold text-white transition hover:bg-[#041e42e6] disabled:opacity-60">{loading ? 'Matching...' : 'Run Match'}</button>
-              {error && <p className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-            </div>
-          </section>
-
-          <section className="space-y-4">
-            <div className="rounded-3xl border border-[#e5e7eb] bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-[#041E42]">Match Results</h2>
-              <p className="mt-1 text-sm text-[#6b7280]">{result ? `${result.total_patients_screened} patients screened for ${result.trial_name}` : 'Run a match to view candidate results.'}</p>
-            </div>
-            {result?.matches.map((match) => <PatientCard key={match.patient_id} match={match} />)}
-          </section>
+    <main className="container">
+      <section className="card" style={{ marginBottom: "1rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <p style={{ margin: 0, fontSize: "0.7rem", letterSpacing: "0.22em", textTransform: "uppercase", fontWeight: 800, color: "var(--cm-teal-3)" }}>
+            Public sample &middot; No sign-in required
+          </p>
+          <h2 style={{ margin: 0 }}>Try the matching engine</h2>
+          <p style={{ margin: 0, color: "var(--cm-muted)" }}>
+            Pick a sample trial, tweak the criteria, and run it against {SAMPLE_PATIENTS.length} bundled patient records. Everything runs in your browser &mdash; nothing is sent to a server.
+          </p>
         </div>
+
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "1rem" }}>
+          {DEMO_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`chip${activePreset === p.id ? " active" : ""}`}
+              onClick={() => applyPreset(p.id)}
+              title={p.description}
+            >
+              {p.label}
+            </button>
+          ))}
+          <Link href="/cohort" className="chip" style={{ marginLeft: "auto", borderColor: "var(--cm-teal-3)", color: "var(--cm-teal)" }}>
+            Full Cohort Builder &rarr;
+          </Link>
+        </div>
+      </section>
+
+      <div className="grid demo-grid" style={{ gap: "1rem" }}>
+        <section className="card">
+          <h3 style={{ marginTop: 0, fontSize: "1.1rem" }}>Cohort Criteria</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+              Trial name
+              <input className="input" style={{ marginTop: "0.25rem" }} value={trialName} onChange={(e) => setTrialName(e.target.value)} />
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+                Age min
+                <input className="input" style={{ marginTop: "0.25rem" }} value={ageMin} onChange={(e) => setAgeMin(e.target.value)} />
+              </label>
+              <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+                Age max
+                <input className="input" style={{ marginTop: "0.25rem" }} value={ageMax} onChange={(e) => setAgeMax(e.target.value)} />
+              </label>
+            </div>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+              Required diagnoses (comma separated)
+              <input className="input" style={{ marginTop: "0.25rem" }} value={inclusionDx} onChange={(e) => setInclusionDx(e.target.value)} />
+            </label>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+              Require HbA1c greater than
+              <input className="input" style={{ marginTop: "0.25rem" }} value={hba1c} onChange={(e) => setHba1c(e.target.value)} />
+            </label>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+              Excluded diagnoses
+              <input className="input" style={{ marginTop: "0.25rem" }} value={exclusionDx} onChange={(e) => setExclusionDx(e.target.value)} />
+            </label>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+              Excluded medications
+              <input className="input" style={{ marginTop: "0.25rem" }} value={exclusionMeds} onChange={(e) => setExclusionMeds(e.target.value)} />
+            </label>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+              Excluded conditions
+              <input className="input" style={{ marginTop: "0.25rem" }} value={exclusionConditions} onChange={(e) => setExclusionConditions(e.target.value)} />
+            </label>
+            <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600 }}>
+              Exclude eGFR less than
+              <input className="input" style={{ marginTop: "0.25rem" }} value={egfr} onChange={(e) => setEgfr(e.target.value)} />
+            </label>
+            <button onClick={handleRun} className="button" style={{ marginTop: "0.25rem" }}>Run Match</button>
+          </div>
+        </section>
+
+        <section>
+          <div className="card" style={{ marginBottom: "0.85rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "1.1rem" }}>Match Results</h3>
+                <p style={{ margin: "0.2rem 0 0", color: "var(--cm-muted)", fontSize: "0.9rem" }}>
+                  {result
+                    ? `${result.total_patients_screened} patients screened for "${result.trial_name}"`
+                    : "Adjust criteria and run a match to see candidates."}
+                </p>
+              </div>
+              {result && (
+                <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+                  <span className="chip" style={{ cursor: "default" }}>High ({counts.High})</span>
+                  <span className="chip" style={{ cursor: "default" }}>Moderate ({counts.Moderate})</span>
+                  <span className="chip" style={{ cursor: "default" }}>Low ({counts.Low})</span>
+                  <span className="chip" style={{ cursor: "default" }}>Excluded ({counts.Excluded})</span>
+                </div>
+              )}
+            </div>
+            {result && (
+              <div style={{ display: "flex", gap: "0.4rem", marginTop: "0.85rem" }}>
+                <button type="button" className={`chip${showFilter === "all" ? " active" : ""}`} onClick={() => setShowFilter("all")}>
+                  All ({result.matches.length})
+                </button>
+                <button type="button" className={`chip${showFilter === "candidates" ? " active" : ""}`} onClick={() => setShowFilter("candidates")}>
+                  Candidates only ({counts.High + counts.Moderate})
+                </button>
+              </div>
+            )}
+          </div>
+          {visibleMatches.map((m) => (
+            <PatientCard key={m.patient_id} match={m} />
+          ))}
+        </section>
       </div>
     </main>
   );
