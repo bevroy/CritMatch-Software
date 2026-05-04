@@ -904,3 +904,307 @@ export function signEdcEntry(
 export function fetchEdcEntryHistory(entryId: string): Promise<EntryHistoryItem[]> {
   return apiFetch(`/api/edc/entries/${entryId}/history`);
 }
+
+// ===========================================================================
+// CTFMS (Clinical Trial Financial Management) types & helpers
+// ===========================================================================
+
+export type CtfmsBudgetItemType =
+  | "per_visit"
+  | "per_procedure"
+  | "fixed_milestone"
+  | "passthrough"
+  | "overhead"
+  | "patient_stipend";
+
+export type CtfmsBudgetStatus = "draft" | "active" | "archived";
+export type CtfmsAccrualStatus = "accrued" | "invoiced" | "void";
+export type CtfmsInvoiceStatus = "draft" | "sent" | "partial" | "paid" | "void";
+export type CtfmsStipendStatus = "pending" | "paid" | "void";
+
+export type CtfmsBudgetItem = {
+  id: string;
+  budget_id: string;
+  code: string | null;
+  name: string;
+  description: string | null;
+  item_type: CtfmsBudgetItemType;
+  unit_price: number;
+  currency: string;
+  edc_form_id: string | null;
+  edc_field_id: string | null;
+  auto_accrue: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CtfmsBudgetItemInput = {
+  code?: string | null;
+  name: string;
+  description?: string | null;
+  item_type?: CtfmsBudgetItemType;
+  unit_price: number;
+  currency: string;
+  edc_form_id?: string | null;
+  edc_field_id?: string | null;
+  auto_accrue?: boolean;
+  active?: boolean;
+};
+
+export type CtfmsBudget = {
+  id: string;
+  study_id: string;
+  name: string;
+  sponsor: string | null;
+  contract_number: string | null;
+  currency: string;
+  version: number;
+  status: CtfmsBudgetStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  items: CtfmsBudgetItem[];
+};
+
+export type CtfmsBudgetSummary = {
+  id: string;
+  study_id: string;
+  name: string;
+  currency: string;
+  version: number;
+  status: CtfmsBudgetStatus;
+  itemCount: number;
+  updated_at: string;
+};
+
+export type CtfmsAccrual = {
+  id: string;
+  study_id: string;
+  budget_id: string;
+  budget_item_id: string;
+  participant_id: string | null;
+  entry_id: string | null;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  currency: string;
+  status: CtfmsAccrualStatus;
+  invoice_line_id: string | null;
+  notes: string | null;
+  accrued_at: string;
+};
+
+export type CtfmsInvoiceLine = {
+  id: string;
+  accrual_id: string | null;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+  currency: string;
+};
+
+export type CtfmsInvoice = {
+  id: string;
+  study_id: string;
+  budget_id: string | null;
+  number: string;
+  currency: string;
+  subtotal: number;
+  total: number;
+  amount_paid: number;
+  status: CtfmsInvoiceStatus;
+  issued_at: string;
+  sent_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  lines: CtfmsInvoiceLine[];
+};
+
+export type CtfmsPayment = {
+  id: string;
+  study_id: string;
+  invoice_id: string | null;
+  amount: number;
+  currency: string;
+  paid_at: string;
+  method: string | null;
+  reference: string | null;
+  notes: string | null;
+  created_at: string;
+};
+
+export type CtfmsStipend = {
+  id: string;
+  study_id: string;
+  participant_id: string;
+  budget_item_id: string | null;
+  entry_id: string | null;
+  amount: number;
+  currency: string;
+  status: CtfmsStipendStatus;
+  paid_at: string | null;
+  method: string | null;
+  reference: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CtfmsFinanceSummary = {
+  accruedOpen: number;
+  accruedInvoiced: number;
+  invoiceTotal: number;
+  paid: number;
+  outstanding: number;
+  stipendsPending: number;
+  stipendsPaid: number;
+};
+
+export function formatMoney(minor: number, currency = "USD"): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(minor / 100);
+  } catch {
+    return `${(minor / 100).toFixed(2)} ${currency}`;
+  }
+}
+
+// --- Budgets -------------------------------------------------------------
+
+export function fetchCtfmsBudgets(studyId: string): Promise<CtfmsBudgetSummary[]> {
+  return apiFetch(`/api/ctfms/budgets?studyId=${encodeURIComponent(studyId)}`);
+}
+
+export function fetchCtfmsBudget(id: string): Promise<CtfmsBudget> {
+  return apiFetch(`/api/ctfms/budgets/${id}`);
+}
+
+export function createCtfmsBudget(payload: {
+  study_id: string;
+  name: string;
+  sponsor?: string;
+  contract_number?: string;
+  currency?: string;
+  notes?: string;
+  items?: CtfmsBudgetItemInput[];
+}): Promise<CtfmsBudget> {
+  return apiFetch(`/api/ctfms/budgets`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export function updateCtfmsBudget(
+  id: string,
+  payload: Partial<{
+    name: string;
+    sponsor: string;
+    contract_number: string;
+    currency: string;
+    notes: string;
+    status: CtfmsBudgetStatus;
+    items: CtfmsBudgetItemInput[];
+  }>,
+): Promise<CtfmsBudget> {
+  return apiFetch(`/api/ctfms/budgets/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+export function deleteCtfmsBudget(id: string): Promise<{ id: string; deleted: boolean }> {
+  return apiFetch(`/api/ctfms/budgets/${id}`, { method: "DELETE" });
+}
+
+// --- Accruals -------------------------------------------------------------
+
+export function fetchCtfmsAccruals(studyId: string, status?: CtfmsAccrualStatus): Promise<CtfmsAccrual[]> {
+  const qs = status ? `&status=${status}` : "";
+  return apiFetch(`/api/ctfms/accruals?studyId=${encodeURIComponent(studyId)}${qs}`);
+}
+
+export function createCtfmsAccrual(
+  budgetId: string,
+  payload: { budget_item_id: string; participant_id?: string; quantity?: number; unit_price?: number; notes?: string },
+): Promise<CtfmsAccrual> {
+  return apiFetch(`/api/ctfms/budgets/${budgetId}/accruals`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateCtfmsAccrual(
+  id: string,
+  payload: { status?: CtfmsAccrualStatus; notes?: string },
+): Promise<CtfmsAccrual> {
+  return apiFetch(`/api/ctfms/accruals/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+// --- Invoices -------------------------------------------------------------
+
+export function fetchCtfmsInvoices(studyId: string): Promise<CtfmsInvoice[]> {
+  return apiFetch(`/api/ctfms/invoices?studyId=${encodeURIComponent(studyId)}`);
+}
+
+export function fetchCtfmsInvoice(id: string): Promise<CtfmsInvoice> {
+  return apiFetch(`/api/ctfms/invoices/${id}`);
+}
+
+export function createCtfmsInvoice(
+  studyId: string,
+  payload: { accrual_ids: string[]; notes?: string },
+): Promise<CtfmsInvoice> {
+  return apiFetch(`/api/ctfms/studies/${studyId}/invoices`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateCtfmsInvoice(
+  id: string,
+  payload: { status?: CtfmsInvoiceStatus; notes?: string },
+): Promise<CtfmsInvoice> {
+  return apiFetch(`/api/ctfms/invoices/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+// --- Payments -------------------------------------------------------------
+
+export function fetchCtfmsPayments(studyId: string): Promise<CtfmsPayment[]> {
+  return apiFetch(`/api/ctfms/payments?studyId=${encodeURIComponent(studyId)}`);
+}
+
+export function recordCtfmsPayment(
+  studyId: string,
+  payload: { invoice_id?: string; amount: number; currency: string; paid_at?: string; method?: string; reference?: string; notes?: string },
+): Promise<CtfmsPayment> {
+  return apiFetch(`/api/ctfms/studies/${studyId}/payments`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+// --- Stipends -------------------------------------------------------------
+
+export function fetchCtfmsStipends(studyId: string, status?: CtfmsStipendStatus): Promise<CtfmsStipend[]> {
+  const qs = status ? `&status=${status}` : "";
+  return apiFetch(`/api/ctfms/stipends?studyId=${encodeURIComponent(studyId)}${qs}`);
+}
+
+export function createCtfmsStipend(
+  studyId: string,
+  payload: { participant_id: string; budget_item_id?: string; amount: number; currency: string; notes?: string },
+): Promise<CtfmsStipend> {
+  return apiFetch(`/api/ctfms/studies/${studyId}/stipends`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateCtfmsStipend(
+  id: string,
+  payload: { status?: CtfmsStipendStatus; method?: string; reference?: string; notes?: string },
+): Promise<CtfmsStipend> {
+  return apiFetch(`/api/ctfms/stipends/${id}`, { method: "PATCH", body: JSON.stringify(payload) });
+}
+
+// --- Summary --------------------------------------------------------------
+
+export function fetchCtfmsFinanceSummary(studyId: string): Promise<CtfmsFinanceSummary> {
+  return apiFetch(`/api/ctfms/studies/${studyId}/summary`);
+}

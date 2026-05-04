@@ -444,3 +444,195 @@ class EdcSignature(Base):
     signed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     entry: Mapped[EdcEntry] = relationship(back_populates="signatures")
+
+
+# ============================================================================
+# CTFMS module — Clinical Trial Financial Management
+# ============================================================================
+
+
+class CtfmsBudget(Base):
+    """One budget per study (versioned via the `version` column)."""
+    __tablename__ = "ctfms_budgets"
+    __table_args__ = (UniqueConstraint("study_id", "version"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("studies.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    sponsor: Mapped[str | None] = mapped_column(Text)
+    contract_number: Mapped[str | None] = mapped_column(Text)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="draft")  # draft | active | archived
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    items: Mapped[list["CtfmsBudgetItem"]] = relationship(
+        back_populates="budget", cascade="all, delete-orphan"
+    )
+
+
+class CtfmsBudgetItem(Base):
+    """A line item in a budget; can be linked to an EDC form or specific field."""
+    __tablename__ = "ctfms_budget_items"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    budget_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ctfms_budgets.id", ondelete="CASCADE"), nullable=False
+    )
+    code: Mapped[str | None] = mapped_column(Text)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    # per_visit | per_procedure | fixed_milestone | passthrough | overhead | patient_stipend
+    item_type: Mapped[str] = mapped_column(Text, nullable=False, default="per_visit")
+    unit_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # minor units (cents)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    # Optional EDC trigger linkage
+    edc_form_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("edc_forms.id", ondelete="SET NULL")
+    )
+    edc_field_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("edc_fields.id", ondelete="SET NULL")
+    )
+    # When True, an EDC entry signing produces an accrual automatically.
+    auto_accrue: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    budget: Mapped[CtfmsBudget] = relationship(back_populates="items")
+
+
+class CtfmsAccrual(Base):
+    """A revenue accrual: 'we have earned X for completing Y'."""
+    __tablename__ = "ctfms_accruals"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("studies.id", ondelete="CASCADE"), nullable=False)
+    budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ctfms_budgets.id", ondelete="CASCADE"), nullable=False)
+    budget_item_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ctfms_budget_items.id", ondelete="CASCADE"), nullable=False
+    )
+    participant_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("study_participants.id", ondelete="SET NULL")
+    )
+    # Optional EDC source pointer (entry that triggered the accrual)
+    entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("edc_entries.id", ondelete="SET NULL")
+    )
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    unit_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # snapshot
+    amount: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # quantity * unit_price
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    # accrued | invoiced | void
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="accrued")
+    invoice_line_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ctfms_invoice_lines.id", ondelete="SET NULL", use_alter=True)
+    )
+    notes: Mapped[str | None] = mapped_column(Text)
+    accrued_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    accrued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CtfmsInvoice(Base):
+    __tablename__ = "ctfms_invoices"
+    __table_args__ = (UniqueConstraint("study_id", "number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("studies.id", ondelete="CASCADE"), nullable=False)
+    budget_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ctfms_budgets.id", ondelete="SET NULL")
+    )
+    number: Mapped[str] = mapped_column(Text, nullable=False)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    subtotal: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    amount_paid: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # draft | sent | partial | paid | void
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="draft")
+    issued_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    lines: Mapped[list["CtfmsInvoiceLine"]] = relationship(
+        back_populates="invoice", cascade="all, delete-orphan"
+    )
+
+
+class CtfmsInvoiceLine(Base):
+    __tablename__ = "ctfms_invoice_lines"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    invoice_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ctfms_invoices.id", ondelete="CASCADE"), nullable=False
+    )
+    accrual_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ctfms_accruals.id", ondelete="SET NULL")
+    )
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    unit_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    invoice: Mapped[CtfmsInvoice] = relationship(back_populates="lines")
+
+
+class CtfmsPayment(Base):
+    __tablename__ = "ctfms_payments"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("studies.id", ondelete="CASCADE"), nullable=False)
+    invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ctfms_invoices.id", ondelete="SET NULL")
+    )
+    amount: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    paid_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    method: Mapped[str | None] = mapped_column(Text)  # ach | wire | check | other
+    reference: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    recorded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class CtfmsStipend(Base):
+    """A patient (participant) stipend owed for a visit/procedure."""
+    __tablename__ = "ctfms_stipends"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    study_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("studies.id", ondelete="CASCADE"), nullable=False)
+    participant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("study_participants.id", ondelete="CASCADE"), nullable=False
+    )
+    budget_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ctfms_budget_items.id", ondelete="SET NULL")
+    )
+    entry_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("edc_entries.id", ondelete="SET NULL")
+    )
+    amount: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    # pending | paid | void
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="pending")
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime)
+    method: Mapped[str | None] = mapped_column(Text)
+    reference: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
+    )

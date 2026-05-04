@@ -31,6 +31,10 @@ export default function HomePage() {
           <h2>EDC</h2>
           <p>Build study forms, identify participants, and pull data points from the EMR.</p>
         </Link>
+        <Link className="card" href="/ctfms">
+          <h2>Finance (CTFMS)</h2>
+          <p>Track sponsor budgets, accruals, invoices, payments, and patient stipends.</p>
+        </Link>
       </div>
     </main>
   );

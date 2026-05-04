@@ -30,7 +30,7 @@ _LEVEL_ORDER: dict[AccessLevel, int] = {
     "admin": 4,
 }
 
-VALID_COLLAB_ROLES = {"viewer", "editor"}
+VALID_COLLAB_ROLES = {"viewer", "editor", "finance"}
 
 
 def _level(study: Study, user: User, db: Session) -> AccessLevel:
@@ -50,7 +50,35 @@ def _level(study: Study, user: User, db: Session) -> AccessLevel:
         return "none"
     if collab.role == "editor":
         return "editor"
+    if collab.role == "finance":
+        # Finance can read everything in the study and is checked separately
+        # for invoicing/payment endpoints via has_finance_access().
+        return "viewer"
     return "viewer"
+
+
+def has_finance_access(study: Study, user: User, db: Session) -> bool:
+    """True if the user can perform finance operations on the study."""
+    if user.role == "admin":
+        return True
+    if study.owner_user_id and study.owner_user_id == user.id:
+        return True
+    collab = (
+        db.query(StudyCollaborator)
+        .filter(
+            StudyCollaborator.study_id == study.id,
+            StudyCollaborator.user_id == user.id,
+        )
+        .first()
+    )
+    return collab is not None and collab.role == "finance"
+
+
+def require_finance_access(study: Study | None, user: User, db: Session) -> None:
+    if study is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Study not found")
+    if not has_finance_access(study, user, db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Finance role required")
 
 
 def access_level(study: Study, user: User, db: Session) -> AccessLevel:
@@ -84,4 +112,6 @@ __all__ = [
     "VALID_COLLAB_ROLES",
     "access_level",
     "require_access",
+    "has_finance_access",
+    "require_finance_access",
 ]

@@ -70,6 +70,7 @@ export default function SiteHeader() {
           <Link href="/cohort">Cohort Builder</Link>
           <Link href="/feasibility">Feasibility</Link>
           <Link href="/edc">EDC</Link>
+          <Link href="/ctfms">Finance</Link>
           <Link href="/results">Results</Link>
           {loaded && session && (session.role === "admin" || session.role === "auditor") ? (
             <Link href="/audit">Audit</Link>

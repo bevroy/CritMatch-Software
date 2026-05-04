@@ -478,6 +478,11 @@ def update_entry(
             entry.locked_at = datetime.utcnow()
         entry.status = payload.status
 
+    # CTFMS auto-accrue when entry transitions to complete or locked.
+    if payload.status in {"complete", "locked"}:
+        from app.services.ctfms import auto_accrue_for_entry
+        auto_accrue_for_entry(db, entry, by_user_id=user.id)
+
     record_audit(
         db,
         user_id=user.id,
@@ -667,6 +672,11 @@ def sign_entry(
     if entry.status == "complete":
         entry.status = "locked"
         entry.locked_at = datetime.utcnow()
+
+    # CTFMS auto-accrue on sign (in case entry was completed without going through PATCH).
+    from app.services.ctfms import auto_accrue_for_entry
+    auto_accrue_for_entry(db, entry, by_user_id=user.id)
+
     record_audit(
         db,
         user_id=user.id,
