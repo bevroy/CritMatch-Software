@@ -1,0 +1,8 @@
+# Intermediates from record_demo.py
+audio/
+video/
+trimmed/
+video_only.mp4
+audio_full.m4a
+concat.txt
+concat_audio.txt
