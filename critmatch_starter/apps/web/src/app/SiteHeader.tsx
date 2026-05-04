@@ -25,6 +25,32 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/results", label: "Results", icon: "📊" },
 ];
 
+type PageInfo = { title: string; subtitle: string };
+
+const PAGE_INFO: Record<string, PageInfo> = {
+  "/studies": { title: "Studies", subtitle: "Manage saved study definitions and cohort workspaces." },
+  "/cohort": { title: "Cohort Builder", subtitle: "Define inclusion and exclusion rules with terminology expansion." },
+  "/results": { title: "Results", subtitle: "Review, filter, and export candidate patient cohorts." },
+  "/feasibility": { title: "Feasibility", subtitle: "Answer trial feasibility questionnaires from EMR data." },
+  "/edc": { title: "EDC", subtitle: "Forms, participants, and EMR data points." },
+  "/ctfms": { title: "Finance (CTFMS)", subtitle: "Budgets, accruals, invoices, payments, and patient stipends." },
+  "/audit": { title: "Audit", subtitle: "Review audit log entries across the platform." },
+  "/launch": { title: "Sign In", subtitle: "Authenticate to access CritMatch." },
+  "/auth": { title: "Authentication", subtitle: "Completing sign in…" },
+  "/builder": { title: "Cohort Builder", subtitle: "Define inclusion and exclusion rules with terminology expansion." },
+  "/demo": { title: "Demo", subtitle: "Interactive walkthrough of the matching engine." },
+};
+
+function getPageInfo(pathname: string): PageInfo | null {
+  if (pathname === "/") return null;
+  // Match longest prefix.
+  const keys = Object.keys(PAGE_INFO).sort((a, b) => b.length - a.length);
+  for (const k of keys) {
+    if (pathname === k || pathname.startsWith(k + "/")) return PAGE_INFO[k];
+  }
+  return null;
+}
+
 export default function SiteHeader() {
   const router = useRouter();
   const pathname = usePathname();
@@ -80,6 +106,7 @@ export default function SiteHeader() {
   }
 
   const isHome = pathname === "/";
+  const pageInfo = getPageInfo(pathname);
 
   return (
     <>
@@ -182,6 +209,24 @@ export default function SiteHeader() {
           )}
         </div>
       </div>
+
+      {pageInfo && (
+        <div className="page-header">
+          <div className="page-header-inner">
+            <Image
+              src="/critmatch-logo-mark.png"
+              alt=""
+              width={216}
+              height={110}
+              className="page-header-logo"
+            />
+            <div className="page-header-text">
+              <h1 className="page-header-title">{pageInfo.title}</h1>
+              <p className="page-header-subtitle">{pageInfo.subtitle}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
