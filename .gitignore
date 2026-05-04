@@ -42,3 +42,9 @@ Thumbs.db
 
 # CritMatch MVP
 critmatch_mvp_starter_package.zip
+
+# Large media / design references (screen recordings, etc.)
+*.mov
+*.mp4
+*.mkv
+*.webm
