@@ -509,13 +509,13 @@ a.card p {
 
 .brand-hero-logo {
   width: auto;
-  height: 140px;
+  height: 110px;
   max-width: 90%;
   display: block;
 }
 
 @media (max-width: 600px) {
-  .brand-hero-logo { height: 100px; }
+  .brand-hero-logo { height: 84px; }
   .brand-hero { padding: 2rem 1rem 1.5rem; }
 }
 
