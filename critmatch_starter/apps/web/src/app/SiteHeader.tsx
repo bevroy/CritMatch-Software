@@ -187,6 +187,12 @@ export default function SiteHeader() {
               ) : null}
             </div>
           </div>
+          <div className="cran-banner" role="note" aria-label="CritMatch CRAN identity banner">
+            <span className="cran-badge">CRAN</span>
+            <span className="cran-text">
+              CritMatch includes the Community Research Access Network.
+            </span>
+          </div>
           {navOpen && (
             <div className="nav-tiles">
               {navItems.map((item) => (
