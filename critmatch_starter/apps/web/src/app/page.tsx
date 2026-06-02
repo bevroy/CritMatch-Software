@@ -56,6 +56,10 @@ export default function HomePage() {
           <h2>💳 Finance (CTFMS)</h2>
           <p>Track sponsor budgets, accruals, invoices, payments, and patient stipends.</p>
         </Link>
+        <Link className="card" href="/roie">
+          <h2>🛰️ ROIE</h2>
+          <p>Research Opportunity Intelligence Engine for study, site, sponsor, and diversity intelligence.</p>
+        </Link>
       </div>
     </main>
   );

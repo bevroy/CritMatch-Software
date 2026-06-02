@@ -605,6 +605,37 @@ export function fetchFeasibilityRuns(questionnaireId: string, limit = 25): Promi
   return apiFetch(`/api/feasibility/questionnaires/${questionnaireId}/runs?${qs.toString()}`);
 }
 
+/* ── ROIE ── */
+
+export interface RoieStatus {
+  module: string;
+  status: string;
+  source: string;
+  refreshedAt: string;
+  note: string;
+}
+
+export interface RoieOpportunity {
+  id: string;
+  title: string;
+  sponsor: string;
+  phase: string;
+  indication: string;
+  region: string;
+  siteMatchScore: number;
+  enrollmentPotential: string;
+  diversityPotential: string;
+}
+
+export function fetchRoieStatus(): Promise<RoieStatus> {
+  return apiFetch("/api/roie/status");
+}
+
+export function fetchRoieOpportunities(limit = 6): Promise<RoieOpportunity[]> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  return apiFetch(`/api/roie/opportunities?${qs.toString()}`);
+}
+
 /* ── Investigators (PI / Sub-I) ── */
 
 export type InvestigatorRole = "principal_investigator" | "sub_investigator";

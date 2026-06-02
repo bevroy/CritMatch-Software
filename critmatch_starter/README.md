@@ -2,6 +2,22 @@
 
 CritMatch is an EHR-embedded cohort identification application for research and related operational use cases.
 
+## Modules
+- Cohort Builder
+- Results
+- Feasibility
+- EDC
+- Finance (CTFMS)
+- Research Opportunity Intelligence Engine (ROIE)
+
+### ROIE functions
+- Study Discovery: Continuously searches ClinicalTrials.gov for relevant studies.
+- Site Matching: Identifies studies aligned with site populations.
+- Feasibility Prediction: Predicts enrollment potential.
+- Sponsor Targeting: Suggests sponsors likely to benefit from site participation.
+- Geographic Analysis: Identifies underserved research regions.
+- Diversity Forecasting: Predicts enrollment diversity potential.
+
 ## Stack
 - Frontend: Next.js
 - Hosting: Netlify
