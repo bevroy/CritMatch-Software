@@ -9,6 +9,7 @@ CritMatch is an EHR-embedded cohort identification application for research and 
 - EDC
 - Finance (CTFMS)
 - Research Opportunity Intelligence Engine (ROIE)
+- Real-World Data & Research Readiness Engine
 
 ### ROIE functions
 - Study Discovery: Continuously searches ClinicalTrials.gov for relevant studies.
@@ -17,6 +18,13 @@ CritMatch is an EHR-embedded cohort identification application for research and 
 - Sponsor Targeting: Suggests sponsors likely to benefit from site participation.
 - Geographic Analysis: Identifies underserved research regions.
 - Diversity Forecasting: Predicts enrollment diversity potential.
+
+### Real-World Data & Research Readiness Engine functions
+- Research Readiness Assessment: Scores site-level research readiness.
+- Eligible Population Estimation: Estimates protocol-fit patient populations.
+- Feasibility Support: Surfaces feasibility tiering for candidate studies.
+- Care Gap Identification: Highlights operational and clinical care gaps.
+- Sponsor-Ready Profiles: Generates sponsor-facing site summaries.
 
 ## Stack
 - Frontend: Next.js

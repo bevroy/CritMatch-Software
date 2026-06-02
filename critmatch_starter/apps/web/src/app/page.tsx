@@ -60,6 +60,10 @@ export default function HomePage() {
           <h2>🛰️ ROIE</h2>
           <p>Research Opportunity Intelligence Engine for study, site, sponsor, and diversity intelligence.</p>
         </Link>
+        <Link className="card" href="/readiness">
+          <h2>🧠 RWD Readiness</h2>
+          <p>Assess research readiness, estimate eligible populations, and build sponsor-ready site profiles.</p>
+        </Link>
       </div>
     </main>
   );

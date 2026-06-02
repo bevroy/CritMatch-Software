@@ -642,6 +642,34 @@ export function fetchRoieOpportunities(limit = 6): Promise<RoieOpportunity[]> {
   return apiFetch(`/api/roie/opportunities?${qs.toString()}`);
 }
 
+/* ── RWD & Readiness ── */
+
+export interface ReadinessStatus {
+  module: string;
+  status: string;
+  refreshedAt: string;
+  note: string;
+}
+
+export interface ReadinessProfile {
+  siteId: string;
+  siteName: string;
+  readinessScore: number;
+  eligiblePopulationEstimate: number;
+  feasibilityTier: string;
+  primaryIndications: string[];
+  careGaps: string[];
+  sponsorReadySummary: string;
+}
+
+export function fetchReadinessStatus(): Promise<ReadinessStatus> {
+  return apiFetch("/api/readiness/status");
+}
+
+export function fetchReadinessProfile(): Promise<ReadinessProfile> {
+  return apiFetch("/api/readiness/profile");
+}
+
 /* ── Investigators (PI / Sub-I) ── */
 
 export type InvestigatorRole = "principal_investigator" | "sub_investigator";
