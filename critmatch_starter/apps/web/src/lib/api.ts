@@ -618,6 +618,12 @@ export interface RoieStatus {
 export interface RoieOpportunity {
   id: string;
   title: string;
+  nctId: string;
+  studyUrl: string;
+  recruitingStatus: string;
+  studyContactName: string | null;
+  studyContactEmail: string | null;
+  studyContactPhone: string | null;
   sponsor: string;
   phase: string;
   indication: string;

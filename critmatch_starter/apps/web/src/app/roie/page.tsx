@@ -131,29 +131,44 @@ export default function RoiePage() {
                 <thead>
                   <tr>
                     <th>Study</th>
+                    <th>NCT</th>
                     <th>Sponsor</th>
+                    <th>Status</th>
                     <th>Phase</th>
                     <th>Region</th>
                     <th>Match</th>
                     <th>Enrollment</th>
                     <th>Diversity</th>
+                    <th>Contact</th>
                   </tr>
                 </thead>
                 <tbody>
                   {opportunities.map((item) => (
                     <tr key={item.id}>
                       <td>
-                        <div style={{ fontWeight: 700 }}>{item.title}</div>
+                        <div style={{ fontWeight: 700 }}>
+                          <a href={item.studyUrl} target="_blank" rel="noreferrer">
+                            {item.title}
+                          </a>
+                        </div>
                         <div style={{ fontSize: "0.83rem", color: "var(--cm-muted)" }}>
                           {item.indication}
                         </div>
                       </td>
+                      <td>{item.nctId}</td>
                       <td>{item.sponsor}</td>
+                      <td>{item.recruitingStatus}</td>
                       <td>{item.phase}</td>
                       <td>{item.region}</td>
                       <td>{Math.round(item.siteMatchScore * 100)}%</td>
                       <td>{item.enrollmentPotential}</td>
                       <td>{item.diversityPotential}</td>
+                      <td>
+                        <div>{item.studyContactName ?? "N/A"}</div>
+                        <div style={{ fontSize: "0.83rem", color: "var(--cm-muted)" }}>
+                          {item.studyContactEmail ?? item.studyContactPhone ?? "N/A"}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -27,6 +27,12 @@ class RoieStatus(BaseModel):
 class RoieOpportunity(BaseModel):
     id: str
     title: str
+    nctId: str
+    studyUrl: str
+    recruitingStatus: str
+    studyContactName: str | None = None
+    studyContactEmail: str | None = None
+    studyContactPhone: str | None = None
     sponsor: str
     phase: str
     indication: str
@@ -58,6 +64,12 @@ def list_roie_opportunities(
         RoieOpportunity(
             id="roie-001",
             title="Phase II Precision Oncology Basket Trial",
+            nctId="NCT06230011",
+            studyUrl="https://clinicaltrials.gov/study/NCT06230011",
+            recruitingStatus="Recruiting",
+            studyContactName="Laura Finch, RN",
+            studyContactEmail="laura.finch@nstar-thera.example",
+            studyContactPhone="+1-312-555-0147",
             sponsor="Northstar Therapeutics",
             phase="Phase II",
             indication="Solid Tumors",
@@ -69,6 +81,12 @@ def list_roie_opportunities(
         RoieOpportunity(
             id="roie-002",
             title="Type 2 Diabetes Real-World Intervention Study",
+            nctId="NCT05992044",
+            studyUrl="https://clinicaltrials.gov/study/NCT05992044",
+            recruitingStatus="Recruiting",
+            studyContactName="Angela Reed",
+            studyContactEmail="angela.reed@asterbio.example",
+            studyContactPhone="+1-404-555-0172",
             sponsor="Aster Biopharma",
             phase="Phase III",
             indication="Endocrinology",
@@ -80,6 +98,12 @@ def list_roie_opportunities(
         RoieOpportunity(
             id="roie-003",
             title="Heart Failure Digital Monitoring Trial",
+            nctId="NCT06117783",
+            studyUrl="https://clinicaltrials.gov/study/NCT06117783",
+            recruitingStatus="Active, not recruiting",
+            studyContactName="Marcus Ellis, MD",
+            studyContactEmail="mellis@helixcardio.example",
+            studyContactPhone="+1-617-555-0139",
             sponsor="Helix Cardio",
             phase="Phase II",
             indication="Cardiology",
@@ -91,6 +115,12 @@ def list_roie_opportunities(
         RoieOpportunity(
             id="roie-004",
             title="Pediatric Rare Disease Registry Expansion",
+            nctId="NCT05874420",
+            studyUrl="https://clinicaltrials.gov/study/NCT05874420",
+            recruitingStatus="Recruiting",
+            studyContactName="Priya Narang",
+            studyContactEmail="p.narang@luminarare.example",
+            studyContactPhone=None,
             sponsor="Lumina Rare",
             phase="Observational",
             indication="Rare Disease",
@@ -102,6 +132,12 @@ def list_roie_opportunities(
         RoieOpportunity(
             id="roie-005",
             title="COPD Rescue Inhaler Comparative Study",
+            nctId="NCT05744092",
+            studyUrl="https://clinicaltrials.gov/study/NCT05744092",
+            recruitingStatus="Not yet recruiting",
+            studyContactName="Kristen Ochoa",
+            studyContactEmail=None,
+            studyContactPhone="+1-602-555-0118",
             sponsor="Summit Respiratory",
             phase="Phase IV",
             indication="Pulmonology",
@@ -113,6 +149,12 @@ def list_roie_opportunities(
         RoieOpportunity(
             id="roie-006",
             title="Chronic Kidney Disease Biomarker Trial",
+            nctId="NCT06011306",
+            studyUrl="https://clinicaltrials.gov/study/NCT06011306",
+            recruitingStatus="Recruiting",
+            studyContactName="Daniel Cho",
+            studyContactEmail="dcho@vantagerenal.example",
+            studyContactPhone="+1-206-555-0194",
             sponsor="Vantage Renal",
             phase="Phase II",
             indication="Nephrology",
