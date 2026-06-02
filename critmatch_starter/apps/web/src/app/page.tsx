@@ -30,37 +30,39 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* The Platform */}
-      <section style={{ marginTop: "1.25rem" }}>
-        <h2 style={{ marginBottom: "0.45rem" }}>The Platform</h2>
+      <section className="card" style={{ marginTop: "1rem" }}>
+        <h2 style={{ marginBottom: "0.45rem" }}>What&apos;s New in CritMatch CRAN</h2>
         <p style={{ marginTop: 0, color: "var(--cm-muted)", lineHeight: 1.55 }}>
-          Explore the full CritMatch CRAN platform, including the newest modules for
-          equity, readiness, community access, and research opportunity intelligence.
+          Updated today with new infrastructure for equitable participation across the
+          Community Research Access Network.
         </p>
+        <div className="grid grid-3" style={{ marginTop: "0.35rem" }}>
+          <article className="card">
+            <h3 style={{ marginBottom: "0.35rem" }}>Community Research Access</h3>
+            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
+              Added Community Network and Navigator Workspace modules for partner referrals
+              and barrier-resolution coordination.
+            </p>
+          </article>
+          <article className="card">
+            <h3 style={{ marginBottom: "0.35rem" }}>Equity & Readiness Intelligence</h3>
+            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
+              Added Equity Scorecards plus the RWD Readiness Engine for site readiness,
+              care-gap visibility, and sponsor-ready profile generation.
+            </p>
+          </article>
+          <article className="card">
+            <h3 style={{ marginBottom: "0.35rem" }}>ROIE Expansion</h3>
+            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
+              Expanded ROIE with NCT IDs, study links, recruiting status, and study contact
+              fields in the opportunity feed.
+            </p>
+          </article>
+        </div>
       </section>
 
       {/* Feature tiles */}
       <div className="grid grid-3" style={{ marginTop: "1.25rem" }}>
-        <Link className="card" href="/roie">
-          <h2>🛰️ ROIE</h2>
-          <p>Research Opportunity Intelligence Engine for study, site, sponsor, and diversity intelligence.</p>
-        </Link>
-        <Link className="card" href="/readiness">
-          <h2>🧠 RWD Readiness</h2>
-          <p>Assess research readiness, estimate eligible populations, and build sponsor-ready site profiles.</p>
-        </Link>
-        <Link className="card" href="/community">
-          <h2>🤝 Community Network</h2>
-          <p>Coordinate partner referrals from community organizations and safety-net sites.</p>
-        </Link>
-        <Link className="card" href="/navigator">
-          <h2>🧭 Navigator Workspace</h2>
-          <p>Track and resolve participant barriers like transportation, language, and childcare.</p>
-        </Link>
-        <Link className="card" href="/equity">
-          <h2>⚖️ Equity Scorecards</h2>
-          <p>Monitor subgroup conversion and receive recommendations for equitable enrollment.</p>
-        </Link>
         <Link className="card" href="/studies">
           <h2>📋 Studies</h2>
           <p>Manage saved study definitions and cohort workspaces.</p>
@@ -85,38 +87,27 @@ export default function HomePage() {
           <h2>💳 Finance (CTFMS)</h2>
           <p>Track sponsor budgets, accruals, invoices, payments, and patient stipends.</p>
         </Link>
+        <Link className="card" href="/roie">
+          <h2>🛰️ ROIE</h2>
+          <p>Research Opportunity Intelligence Engine for study, site, sponsor, and diversity intelligence.</p>
+        </Link>
+        <Link className="card" href="/readiness">
+          <h2>🧠 RWD Readiness</h2>
+          <p>Assess research readiness, estimate eligible populations, and build sponsor-ready site profiles.</p>
+        </Link>
+        <Link className="card" href="/community">
+          <h2>🤝 Community Network</h2>
+          <p>Coordinate partner referrals from community organizations and safety-net sites.</p>
+        </Link>
+        <Link className="card" href="/navigator">
+          <h2>🧭 Navigator Workspace</h2>
+          <p>Track and resolve participant barriers like transportation, language, and childcare.</p>
+        </Link>
+        <Link className="card" href="/equity">
+          <h2>⚖️ Equity Scorecards</h2>
+          <p>Monitor subgroup conversion and receive recommendations for equitable enrollment.</p>
+        </Link>
       </div>
-
-      <section className="card" style={{ marginTop: "1.25rem" }}>
-        <h2 style={{ marginBottom: "0.45rem" }}>Competitive Position</h2>
-        <p style={{ marginTop: 0, color: "var(--cm-muted)", lineHeight: 1.55 }}>
-          CritMatch differentiates from point tools by combining cohort discovery, site readiness,
-          community referral operations, and equity performance into one EHR-integrated platform.
-        </p>
-        <div className="grid grid-3" style={{ marginTop: "0.35rem" }}>
-          <article className="card">
-            <h3 style={{ marginBottom: "0.35rem" }}>From Identification to Enrollment</h3>
-            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
-              Move beyond candidate lists by coordinating navigators, referral partners, and barrier
-              resolution in the same workflow.
-            </p>
-          </article>
-          <article className="card">
-            <h3 style={{ marginBottom: "0.35rem" }}>Readiness + Opportunity Intelligence</h3>
-            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
-              Match external opportunities with internal readiness signals to prioritize studies that
-              are both operationally feasible and equitable.
-            </p>
-          </article>
-          <article className="card">
-            <h3 style={{ marginBottom: "0.35rem" }}>Equity by Design</h3>
-            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
-              Track subgroup conversion and intervention impact continuously, rather than treating
-              equity as a retrospective reporting step.
-            </p>
-          </article>
-        </div>
-      </section>
     </main>
   );
 }
