@@ -64,6 +64,18 @@ export default function HomePage() {
           <h2>🧠 RWD Readiness</h2>
           <p>Assess research readiness, estimate eligible populations, and build sponsor-ready site profiles.</p>
         </Link>
+        <Link className="card" href="/community">
+          <h2>🤝 Community Network</h2>
+          <p>Coordinate partner referrals from community organizations and safety-net sites.</p>
+        </Link>
+        <Link className="card" href="/navigator">
+          <h2>🧭 Navigator Workspace</h2>
+          <p>Track and resolve participant barriers like transportation, language, and childcare.</p>
+        </Link>
+        <Link className="card" href="/equity">
+          <h2>⚖️ Equity Scorecards</h2>
+          <p>Monitor subgroup conversion and receive recommendations for equitable enrollment.</p>
+        </Link>
       </div>
     </main>
   );

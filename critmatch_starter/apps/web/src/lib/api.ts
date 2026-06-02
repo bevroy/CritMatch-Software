@@ -670,6 +670,88 @@ export function fetchReadinessProfile(): Promise<ReadinessProfile> {
   return apiFetch("/api/readiness/profile");
 }
 
+/* ── Community Partner Network ── */
+
+export interface CommunityPartner {
+  id: string;
+  name: string;
+  kind: string;
+  city: string;
+  state: string;
+  languages: string[];
+  activeReferrals: number;
+  enrolledParticipants: number;
+  lastActivity: string;
+}
+
+export interface CommunitySummary {
+  partnerCount: number;
+  activeReferrals: number;
+  enrolledParticipants: number;
+  topLanguageNeeds: string[];
+}
+
+export function fetchCommunityPartners(): Promise<CommunityPartner[]> {
+  return apiFetch("/api/community/partners");
+}
+
+export function fetchCommunitySummary(): Promise<CommunitySummary> {
+  return apiFetch("/api/community/summary");
+}
+
+/* ── Navigator Workspace ── */
+
+export interface NavigatorTask {
+  id: string;
+  participantId: string;
+  participantAlias: string;
+  barrier: string;
+  priority: string;
+  status: string;
+  dueDate: string;
+  assignedTo: string;
+}
+
+export interface NavigatorMetrics {
+  openTasks: number;
+  inProgressTasks: number;
+  resolvedTasks30d: number;
+  medianResolutionDays: number;
+}
+
+export function fetchNavigatorTasks(): Promise<NavigatorTask[]> {
+  return apiFetch("/api/navigator/tasks");
+}
+
+export function fetchNavigatorMetrics(): Promise<NavigatorMetrics> {
+  return apiFetch("/api/navigator/metrics");
+}
+
+/* ── Equity Scorecards ── */
+
+export interface EquityMetric {
+  category: string;
+  subgroup: string;
+  screened: number;
+  enrolled: number;
+  conversionRate: number;
+}
+
+export interface EquityAlert {
+  id: string;
+  severity: string;
+  title: string;
+  recommendation: string;
+}
+
+export function fetchEquityScorecard(): Promise<EquityMetric[]> {
+  return apiFetch("/api/equity/scorecard");
+}
+
+export function fetchEquityAlerts(): Promise<EquityAlert[]> {
+  return apiFetch("/api/equity/alerts");
+}
+
 /* ── Investigators (PI / Sub-I) ── */
 
 export type InvestigatorRole = "principal_investigator" | "sub_investigator";
