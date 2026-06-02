@@ -30,6 +30,37 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="card" style={{ marginTop: "1rem" }}>
+        <h2 style={{ marginBottom: "0.45rem" }}>What&apos;s New in CritMatch CRAN</h2>
+        <p style={{ marginTop: 0, color: "var(--cm-muted)", lineHeight: 1.55 }}>
+          Updated today with new infrastructure for equitable participation across the
+          Community Research Access Network.
+        </p>
+        <div className="grid grid-3" style={{ marginTop: "0.35rem" }}>
+          <article className="card">
+            <h3 style={{ marginBottom: "0.35rem" }}>Community Research Access</h3>
+            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
+              Added Community Network and Navigator Workspace modules for partner referrals
+              and barrier-resolution coordination.
+            </p>
+          </article>
+          <article className="card">
+            <h3 style={{ marginBottom: "0.35rem" }}>Equity & Readiness Intelligence</h3>
+            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
+              Added Equity Scorecards plus the RWD Readiness Engine for site readiness,
+              care-gap visibility, and sponsor-ready profile generation.
+            </p>
+          </article>
+          <article className="card">
+            <h3 style={{ marginBottom: "0.35rem" }}>ROIE Expansion</h3>
+            <p style={{ margin: 0, color: "var(--cm-muted)" }}>
+              Expanded ROIE with NCT IDs, study links, recruiting status, and study contact
+              fields in the opportunity feed.
+            </p>
+          </article>
+        </div>
+      </section>
+
       {/* Feature tiles */}
       <div className="grid grid-3" style={{ marginTop: "1.25rem" }}>
         <Link className="card" href="/studies">
