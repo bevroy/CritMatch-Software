@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/ctfms", label: "Finance", icon: "💳" },
   { href: "/results", label: "Results", icon: "📊" },
   { href: "/user-guide", label: "User Guide", icon: "📘" },
+  { href: "/technical", label: "Technical", icon: "⚙️" },
 ];
 
 type PageInfo = { title: string; subtitle: string };
@@ -46,6 +47,7 @@ const PAGE_INFO: Record<string, PageInfo> = {
   "/edc": { title: "EDC", subtitle: "Forms, participants, and EMR data points." },
   "/ctfms": { title: "Finance (CTFMS)", subtitle: "Budgets, accruals, invoices, payments, and patient stipends." },
   "/user-guide": { title: "User Guide", subtitle: "Step-by-step module workflows in navigation order." },
+  "/technical": { title: "Technical", subtitle: "Architecture, stack, integrations, and deployment details." },
   "/audit": { title: "Audit", subtitle: "Review audit log entries across the platform." },
   "/launch": { title: "Sign In", subtitle: "Authenticate to access CritMatch." },
   "/auth": { title: "Authentication", subtitle: "Completing sign in…" },
