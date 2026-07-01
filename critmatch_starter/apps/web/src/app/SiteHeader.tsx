@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/edc", label: "EDC", icon: "📝" },
   { href: "/ctfms", label: "Finance", icon: "💳" },
   { href: "/results", label: "Results", icon: "📊" },
+  { href: "/user-guide", label: "User Guide", icon: "📘" },
 ];
 
 type PageInfo = { title: string; subtitle: string };
@@ -44,6 +45,7 @@ const PAGE_INFO: Record<string, PageInfo> = {
   "/equity": { title: "Equity Scorecards", subtitle: "Monitor subgroup conversion and recommended equity interventions." },
   "/edc": { title: "EDC", subtitle: "Forms, participants, and EMR data points." },
   "/ctfms": { title: "Finance (CTFMS)", subtitle: "Budgets, accruals, invoices, payments, and patient stipends." },
+  "/user-guide": { title: "User Guide", subtitle: "Step-by-step module workflows in navigation order." },
   "/audit": { title: "Audit", subtitle: "Review audit log entries across the platform." },
   "/launch": { title: "Sign In", subtitle: "Authenticate to access CritMatch." },
   "/auth": { title: "Authentication", subtitle: "Completing sign in…" },
@@ -106,7 +108,7 @@ export default function SiteHeader() {
 
   const showAudit = loaded && session && (session.role === "admin" || session.role === "auditor");
   const navItems: NavItem[] = showAudit
-    ? [...NAV_ITEMS, { href: "/audit", label: "Audit", icon: "🔍" }]
+    ? [...NAV_ITEMS.slice(0, -1), { href: "/audit", label: "Audit", icon: "🔍" }, NAV_ITEMS[NAV_ITEMS.length - 1]]
     : NAV_ITEMS;
 
   function isActive(href: string): boolean {
