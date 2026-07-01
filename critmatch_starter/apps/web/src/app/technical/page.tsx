@@ -110,7 +110,7 @@ export default function TechnicalPage() {
             </div>
 
             <div style={{ display: "flex", justifyContent: "center", margin: "0.75rem 0", color: "var(--cm-teal-3)", fontWeight: 800 }}>
-              Users/EHR -> Web App -> API
+              {"Users/EHR -> Web App -> API"}
             </div>
 
             <div className="grid grid-3" style={{ alignItems: "stretch", gap: "0.75rem" }}>
@@ -135,7 +135,7 @@ export default function TechnicalPage() {
             </div>
 
             <div style={{ display: "flex", justifyContent: "center", marginTop: "0.75rem", color: "var(--cm-teal-3)", fontWeight: 800 }}>
-              API <-> Worker <-> Postgres | Web/API/Worker -> Sentry | API <-> FHIR
+              {"API <-> Worker <-> Postgres | Web/API/Worker -> Sentry | API <-> FHIR"}
             </div>
           </div>
 
