@@ -48,10 +48,10 @@ export function logout(): Promise<void> {
   return apiFetch("/api/auth/logout", { method: "POST" });
 }
 
-export function emailLogin(email: string, name?: string): Promise<SessionInfo> {
+export function emailLogin(email: string, password: string, name?: string): Promise<SessionInfo> {
   return apiFetch("/api/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, name }),
+    body: JSON.stringify({ email, password, name }),
   });
 }
 

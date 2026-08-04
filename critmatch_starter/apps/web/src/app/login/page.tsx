@@ -16,11 +16,19 @@ function describeError(e: unknown): string {
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [existingSession, setExistingSession] = useState<SessionInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [nextPath, setNextPath] = useState("/studies");
+
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    const value = qs.get("next") || "/studies";
+    setNextPath(value.startsWith("/") ? value : "/studies");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,9 +38,6 @@ export default function LoginPage() {
           return;
         }
         setExistingSession(session);
-        window.setTimeout(() => {
-          router.replace("/studies");
-        }, 1000);
       })
       .catch(() => {
         if (!cancelled) {
@@ -49,15 +54,15 @@ export default function LoginPage() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, []);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await emailLogin(email.trim(), name.trim() || undefined);
-      router.replace("/studies");
+      await emailLogin(email.trim(), password, name.trim() || undefined);
+      router.replace(nextPath);
     } catch (err) {
       setError(describeError(err));
       setLoading(false);
@@ -70,6 +75,7 @@ export default function LoginPage() {
     });
     setExistingSession(null);
     setEmail("");
+    setPassword("");
     setName("");
   }
 
@@ -90,10 +96,10 @@ export default function LoginPage() {
         <section className="card">
           <h1 style={{ marginBottom: "0.5rem" }}>Account</h1>
           <p style={{ color: "#5b7575", marginTop: 0 }}>
-            Redirecting to studies as {existingSession.role}...
+            Signed in as {existingSession.role}.
           </p>
           <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
-            <button className="button" type="button" onClick={() => router.replace("/studies")}>
+            <button className="button" type="button" onClick={() => router.replace(nextPath)}>
               Continue now
             </button>
             <button className="button-secondary" type="button" onClick={handleSignOut}>
@@ -125,6 +131,20 @@ export default function LoginPage() {
               placeholder="name@critmatchresearch.com"
               required
               autoComplete="email"
+            />
+          </label>
+
+          <label style={{ display: "grid", gap: "0.35rem" }}>
+            <span style={{ fontWeight: 700 }}>Password</span>
+            <input
+              className="input"
+              type="password"
+              value={password}
+              onChange={(ev) => setPassword(ev.target.value)}
+              placeholder="At least 8 characters"
+              required
+              minLength={8}
+              autoComplete="current-password"
             />
           </label>
 

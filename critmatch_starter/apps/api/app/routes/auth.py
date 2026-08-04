@@ -30,6 +30,10 @@ from __future__ import annotations
 
 import time
 import uuid
+import base64
+import hashlib
+import hmac
+import secrets
 from email.utils import parseaddr
 from typing import Any
 
@@ -110,6 +114,7 @@ class SessionResponse(BaseModel):
 
 class EmailLoginRequest(BaseModel):
     email: str
+    password: str
     name: str | None = None
 
 
@@ -149,6 +154,32 @@ def _issue_session_cookie(response: Response, settings, user: User, claims: dict
     )
 
 
+def _hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    iterations = 200_000
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return "pbkdf2_sha256${}${}${}".format(
+        iterations,
+        base64.b64encode(salt).decode("ascii"),
+        base64.b64encode(dk).decode("ascii"),
+    )
+
+
+def _verify_password(password: str, encoded: str) -> bool:
+    try:
+        algo, iter_s, salt_b64, hash_b64 = encoded.split("$", 3)
+        if algo != "pbkdf2_sha256":
+            return False
+        iterations = int(iter_s)
+        salt = base64.b64decode(salt_b64.encode("ascii"))
+        expected = base64.b64decode(hash_b64.encode("ascii"))
+    except Exception:
+        return False
+
+    actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+    return hmac.compare_digest(actual, expected)
+
+
 @router.post("/login", response_model=SessionResponse)
 def email_login(
     payload: EmailLoginRequest,
@@ -164,8 +195,11 @@ def email_login(
 
     settings = get_settings()
     email = _normalize_email(payload.email)
+    password = (payload.password or "").strip()
     if not email or "@" not in email:
         raise HTTPException(status_code=400, detail="Valid email is required")
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
     if not _is_allowed_email(email, settings):
         raise HTTPException(
             status_code=403,
@@ -181,11 +215,25 @@ def email_login(
             name=display_name,
             email=email,
             role="research_user",
+            password_hash=_hash_password(password),
         )
         db.add(user)
         db.flush()
     elif not user.email:
         user.email = email
+    if user.password_hash:
+        if not _verify_password(password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+    else:
+        # Backward compatibility for existing first-party accounts created
+        # before password support was introduced.
+        if (user.ehr_user_id or "").startswith("email:"):
+            user.password_hash = _hash_password(password)
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail="Password login is not enabled for this account. Use SMART launch sign-in.",
+            )
 
     record_audit(
         db,
