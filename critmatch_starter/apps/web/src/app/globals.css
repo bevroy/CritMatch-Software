@@ -319,43 +319,6 @@ tbody tr:hover {
   line-height: 1;
 }
 
-.cran-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  padding: 0 1.25rem 0.75rem;
-  color: var(--cm-teal);
-}
-
-.cran-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 3.1rem;
-  padding: 0.18rem 0.52rem;
-  border-radius: 999px;
-  border: 1px solid var(--cm-mint-200);
-  background: var(--cm-mint-50);
-  color: var(--cm-teal-2);
-  font-weight: 800;
-  font-size: 0.72rem;
-  letter-spacing: 0.08em;
-}
-
-.cran-text {
-  font-size: 0.82rem;
-  color: var(--cm-muted);
-  font-weight: 700;
-}
-
-@media (max-width: 760px) {
-  .cran-banner {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.3rem;
-  }
-}
-
 .nav-tiles {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
