@@ -17,6 +17,7 @@ type NavItem = { href: string; label: string; icon: string };
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Home", icon: "🏠" },
+  { href: "/login", label: "Account", icon: "👤" },
   { href: "/studies", label: "Studies", icon: "📋" },
   { href: "/cohort", label: "Cohort Builder", icon: "🧩" },
   { href: "/feasibility", label: "Feasibility", icon: "📈" },
@@ -136,7 +137,7 @@ export default function SiteHeader() {
               <span className="nav-toggle-chevron">{navOpen ? "▲" : "▼"}</span>
             </button>
             <div className="nav-session">
-              {loaded && session ? (
+              {session ? (
                 <>
                   <NotificationsBell />
                   <span className="session-meta">
@@ -179,7 +180,7 @@ export default function SiteHeader() {
                     Auditor
                   </button>
                 </>
-              ) : loaded ? (
+              ) : (
                 <Link
                   href="/login"
                   className="button-secondary"

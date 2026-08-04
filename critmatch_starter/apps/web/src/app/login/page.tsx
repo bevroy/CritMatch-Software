@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ApiError, emailLogin, getMe, type SessionInfo } from "../../lib/api";
+import { ApiError, emailLogin, getMe, logout, type SessionInfo } from "../../lib/api";
 
 function describeError(e: unknown): string {
   if (e instanceof ApiError) {
@@ -64,6 +64,15 @@ export default function LoginPage() {
     }
   }
 
+  async function handleSignOut() {
+    await logout().catch(() => {
+      // noop
+    });
+    setExistingSession(null);
+    setEmail("");
+    setName("");
+  }
+
   if (checkingSession) {
     return (
       <main className="container" style={{ maxWidth: 720 }}>
@@ -79,13 +88,16 @@ export default function LoginPage() {
     return (
       <main className="container" style={{ maxWidth: 720 }}>
         <section className="card">
-          <h1 style={{ marginBottom: "0.5rem" }}>You are already signed in</h1>
+          <h1 style={{ marginBottom: "0.5rem" }}>Account</h1>
           <p style={{ color: "#5b7575", marginTop: 0 }}>
             Redirecting to studies as {existingSession.role}...
           </p>
           <div style={{ display: "flex", gap: "0.6rem", alignItems: "center", flexWrap: "wrap" }}>
             <button className="button" type="button" onClick={() => router.replace("/studies")}>
               Continue now
+            </button>
+            <button className="button-secondary" type="button" onClick={handleSignOut}>
+              Sign out
             </button>
           </div>
         </section>
