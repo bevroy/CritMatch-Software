@@ -14,7 +14,15 @@ function isPublicPath(pathname: string): boolean {
   return false;
 }
 
-export function middleware(request: NextRequest) {
+function redirectToLogin(request: NextRequest, pathname: string, search: string) {
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  url.search = "";
+  url.searchParams.set("next", `${pathname}${search}`);
+  return NextResponse.redirect(url);
+}
+
+export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
   if (isPublicPath(pathname)) {
     return NextResponse.next();
@@ -22,15 +30,26 @@ export function middleware(request: NextRequest) {
 
   const cookieName = process.env.SESSION_COOKIE_NAME || "critmatch_session";
   const sessionCookie = request.cookies.get(cookieName)?.value;
-  if (sessionCookie) {
-    return NextResponse.next();
+  if (!sessionCookie) {
+    return redirectToLogin(request, pathname, search);
   }
 
-  const url = request.nextUrl.clone();
-  url.pathname = "/login";
-  url.search = "";
-  url.searchParams.set("next", `${pathname}${search}`);
-  return NextResponse.redirect(url);
+  // Validate the session against the API. A stale or forged cookie should not
+  // grant access to protected routes.
+  try {
+    const meUrl = new URL("/api/auth/me", request.nextUrl.origin);
+    const meResp = await fetch(meUrl, {
+      method: "GET",
+      headers: { cookie: request.headers.get("cookie") || "" },
+    });
+    if (meResp.ok) {
+      return NextResponse.next();
+    }
+  } catch {
+    // Treat upstream/API failures as unauthenticated for protected pages.
+  }
+
+  return redirectToLogin(request, pathname, search);
 }
 
 export const config = {
