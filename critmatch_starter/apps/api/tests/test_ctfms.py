@@ -337,7 +337,7 @@ def test_auto_accrue_skips_falsy_per_procedure(authed_client, db_session, authed
          "currency": "USD", "edc_form_id": form["id"], "edc_field_id": fields["ecg"]["id"]},
     ])
     p = authed_client.post(f"/api/studies/{study.id}/participants", json={
-        "patient_id": "pat-2", "subject_id": "S-002",
+        "patient_id": "pat-2", "subject_id": "S-002", "status": "enrolled",
     }).json()
     entry = authed_client.post(f"/api/edc/forms/{form['id']}/entries",
                                json={"participant_id": p["id"]}).json()

@@ -206,7 +206,7 @@ def _serialize_entry(entry: EdcEntry) -> EntryResponse:
 
 
 def _get_fhir_client_override(request: Request) -> FHIRClient | None:
-    """Test seam — tests can stash a fake on ``app.state.edc_fhir_client``."""
+    """Test seam - tests can stash a fake on ``app.state.edc_fhir_client``."""
     return getattr(request.app.state, "edc_fhir_client", None)
 
 
@@ -637,6 +637,21 @@ def sign_entry(
         raise HTTPException(status_code=409, detail="Entry must be complete before signing")
 
     settings = get_settings()
+    # PATCHED (audit fix, high): previously fell back to the hardcoded
+    # public string "edc-fallback" as the HMAC key when SESSION_SECRET was
+    # unset, unlike core/security.py's issue_session_token/verify_session_token,
+    # which correctly raise when that same setting is missing. Since
+    # SESSION_SECRET is `sync: false` in render.yaml (an operator can forget
+    # to set it), any deploy that omits it would accept and "validate"
+    # Part-11-style e-signatures signed with a secret published in this
+    # repo, defeating the signature's integrity guarantee. Fail closed
+    # instead, matching security.py's own pattern.
+    if not settings.session_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="SESSION_SECRET not configured; cannot produce a trustworthy e-signature",
+        )
+
     snapshot = json.dumps(
         {
             "entry_id": str(entry.id),
@@ -656,7 +671,7 @@ def sign_entry(
         sort_keys=True,
     )
     digest = hmac.new(
-        (settings.session_secret or "edc-fallback").encode(),
+        settings.session_secret.encode(),
         snapshot.encode(),
         hashlib.sha256,
     ).hexdigest()

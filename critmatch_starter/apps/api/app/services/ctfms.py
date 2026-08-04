@@ -1,4 +1,4 @@
-"""CTFMS business logic — accrual generation, totals, invoice numbering."""
+"""CTFMS business logic - accrual generation, totals, invoice numbering."""
 
 from __future__ import annotations
 
@@ -78,6 +78,18 @@ def auto_accrue_for_entry(db: Session, entry: EdcEntry, *, by_user_id: uuid.UUID
     participant = db.get(StudyParticipant, entry.participant_id) if entry.participant_id else None
     if participant is None:
         return []
+
+    # PATCHED (audit fix, medium): previously only checked that the
+    # participant row existed, not that they were actually enrolled in the
+    # study. An EDC entry could be marked complete/locked (which triggers
+    # this function from routes/edc.py's update_entry and sign_entry) for a
+    # participant still in "screening" or already "withdrawn", generating
+    # real financial accruals/invoices for visits tied to patients who were
+    # never confirmed enrolled. Only participants who are (or have been)
+    # actually enrolled can generate an accrual now.
+    if participant.status not in {"enrolled", "completed"}:
+        return []
+
     budget = active_budget_for_study(db, participant.study_id)
     if budget is None:
         return []

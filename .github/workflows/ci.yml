@@ -25,7 +25,7 @@ jobs:
           pip install pytest pytest-asyncio
       - name: Run tests
         env:
-          DATABASE_URL: sqlite+pysqlite:///:memory:
+          DATABASE_URL: "sqlite+pysqlite:///:memory:"
           SESSION_SECRET: ci-secret
           EXPORT_SIGNING_KEY: ci-export-key
           APP_ENV: test
@@ -45,6 +45,8 @@ jobs:
           cache: npm
           cache-dependency-path: critmatch_starter/apps/web/package-lock.json
       - run: npm ci
+      # PATCHED (audit fix, high): ensure web lint passes in CI.
+      - run: npm run lint
       - run: npm run build
         env:
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000

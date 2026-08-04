@@ -318,9 +318,9 @@ def add_collaborator(
             user_id=target.id,
             kind="study_shared" if action == "study_collaborator_add" else "study_role_changed",
             title=(
-                f"You were added to “{study.name}” as {payload.role}"
+                f"You were added to \"{study.name}\" as {payload.role}"
                 if action == "study_collaborator_add"
-                else f"Your role on “{study.name}” is now {payload.role}"
+                else f"Your role on \"{study.name}\" is now {payload.role}"
             ),
             body=f"Shared by {user.name}.",
             link=f"/studies/{study.id}",
@@ -411,7 +411,7 @@ def transfer_ownership(
             db,
             user_id=new_owner.id,
             kind="study_ownership_transferred",
-            title=f"You are now the owner of “{study.name}”",
+            title=f"You are now the owner of \"{study.name}\"",
             body=f"Transferred by {user.name}.",
             link=f"/studies/{study.id}",
             metadata={"studyId": str(study.id), "actorUserId": str(user.id)},
@@ -422,7 +422,7 @@ def transfer_ownership(
 
 
 # ---------------------------------------------------------------------------
-# User search (admin-only) – useful for the sharing UI
+# User search (for the sharing UI - see PATCHED note below)
 # ---------------------------------------------------------------------------
 
 
@@ -432,12 +432,31 @@ def search_users(
     db: Session = Depends(get_db),
     q: str = Query(default="", min_length=0, max_length=120),
     limit: int = Query(default=20, ge=1, le=100),
+    study_id: str = Query(
+        ...,
+        description="Study the caller is granting access to; caller must own it",
+    ),
 ) -> list[dict]:
-    """Return users matching the given query.
+    """Return users matching the given query, for a study owner's sharing UI.
 
-    Accessible to anyone signed in so an owner can grant access. Returns the
-    minimum identifying info needed to populate a picker.
+    PATCHED (audit fix, high - required frontend change): this endpoint's
+    own section header used to read "User search (admin-only)", but the
+    handler only depended on `CurrentUser` - any signed-in user, not just
+    admins or study owners, could search the full user directory by name,
+    email, or ehr_user_id, with no scoping to studies they could actually
+    access, and get back matches including email addresses. The docstring
+    even said "accessible to anyone signed in", contradicting the section's
+    own label - this reads like a role check that was intended but never
+    wired up.
+
+    Now requires a `study_id` and the caller must be that study's owner
+    (matching the only real use case described in the original docstring:
+    an owner picking someone to add as a collaborator). `require_access`'s
+    own admin bypass still applies. This is a breaking API change for the
+    frontend's user picker, which now needs to pass the study_id it's
+    already operating in the context of.
     """
+    study = _study_for(db, study_id, user, minimum="owner")
     base = db.query(User)
     if q:
         like = f"%{q}%"
@@ -445,6 +464,7 @@ def search_users(
             or_(User.name.ilike(like), User.email.ilike(like), User.ehr_user_id.ilike(like))
         )
     rows = base.order_by(User.name.asc()).limit(limit).all()
+    _ = study  # access already enforced above; study object not otherwise needed
     return [
         {
             "id": str(u.id),

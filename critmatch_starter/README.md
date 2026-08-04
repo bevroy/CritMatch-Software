@@ -99,3 +99,21 @@ python app/main.py
 - Render deploys the API from `critmatch_starter/apps/api`
 - Render deploys the worker from `critmatch_starter/apps/worker`
 - Render provisions the Postgres database
+
+## Authentication
+
+- CritMatch now supports first-party email login at `/login` in the web app.
+- Access is restricted to organizational email domains only.
+- Default allowed domains are:
+  - `critmatchresearch.com`
+  - `elionyxhealth.com`
+
+Set this explicitly in API environment variables:
+
+```env
+LOGIN_EMAIL_DOMAIN_ALLOWLIST=critmatchresearch.com,elionyxhealth.com
+```
+
+SMART launch is still supported (`/launch` and `/auth/callback`), and the
+same domain allowlist policy is enforced on SMART users via the id_token
+email claim.

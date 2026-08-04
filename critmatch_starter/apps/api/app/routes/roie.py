@@ -2,18 +2,33 @@
 
 These endpoints provide lightweight, deterministic payloads so the web app can
 render interactive ROIE views before full pipeline integration lands.
+
+PATCHED (audit fix, medium): both endpoints already labeled their payload as
+"preview"/placeholder data in the response body (``status="preview"`` and a
+``note`` field), but there was no server-side signal an operator could alert
+on if this fake data ever got surfaced somewhere a user could mistake it for
+real results (a page exists in the web app at ``apps/web/src/app/roie/page.tsx``).
+Added a log warning on every call when running in production, plus an
+``X-CritMatch-Preview-Data`` response header, so this is observable and
+alertable without guessing at (and potentially getting wrong) whether an
+operator wants the feature hard-disabled in production - that's a product
+decision this patch doesn't have enough information to make safely.
 """
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
 from pydantic import BaseModel
 
+from app.core.config import get_settings
 from app.deps.auth import CurrentUser
 
 router = APIRouter()
+
+logger = logging.getLogger("critmatch.roie")
 
 
 class RoieStatus(BaseModel):
@@ -42,9 +57,16 @@ class RoieOpportunity(BaseModel):
     diversityPotential: str
 
 
+def _mark_preview_response(response: Response) -> None:
+    response.headers["X-CritMatch-Preview-Data"] = "true"
+    if get_settings().is_production:
+        logger.warning("ROIE preview/placeholder data served in production")
+
+
 @router.get("/status", response_model=RoieStatus)
-def get_roie_status(user: CurrentUser) -> RoieStatus:
+def get_roie_status(user: CurrentUser, response: Response) -> RoieStatus:
     _ = user
+    _mark_preview_response(response)
     return RoieStatus(
         module="ROIE",
         status="preview",
@@ -57,9 +79,11 @@ def get_roie_status(user: CurrentUser) -> RoieStatus:
 @router.get("/opportunities", response_model=list[RoieOpportunity])
 def list_roie_opportunities(
     user: CurrentUser,
+    response: Response,
     limit: int = Query(default=6, ge=1, le=20),
 ) -> list[RoieOpportunity]:
     _ = user
+    _mark_preview_response(response)
     seed: list[RoieOpportunity] = [
         RoieOpportunity(
             id="roie-001",

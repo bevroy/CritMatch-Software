@@ -1,3 +1,7 @@
+# PATCHED (audit fix, medium - informational only, no behavior change):
+# this file and critmatch_starter/apps/web/netlify.toml disagree with each
+# other. Confirm which one the live Netlify site actually uses, then remove
+# the other to avoid accidental config drift.
 [build]
   base = "critmatch_starter/apps/web"
   command = "npm run build"

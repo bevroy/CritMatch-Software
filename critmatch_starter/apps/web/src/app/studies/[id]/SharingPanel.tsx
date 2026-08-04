@@ -61,7 +61,7 @@ export default function SharingPanel({ studyId, onOwnerChanged }: SharingPanelPr
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        setResults(await searchUsers(term, 10));
+        setResults(await searchUsers(studyId, term, 10));
       } catch {
         setResults([]);
       } finally {

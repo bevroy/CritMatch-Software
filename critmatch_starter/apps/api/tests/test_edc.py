@@ -14,7 +14,8 @@ class FakeFHIR:
         self._resources = resources or {}
         self._reads = reads or {}
 
-    def search(self, resource_type, params=None, *, page_limit=20):
+    def search(self, resource_type, params=None, *, page_limit=20, on_limit="raise"):
+        _ = on_limit
         for r in self._resources.get(resource_type, []):
             yield r
 

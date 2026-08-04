@@ -48,6 +48,13 @@ export function logout(): Promise<void> {
   return apiFetch("/api/auth/logout", { method: "POST" });
 }
 
+export function emailLogin(email: string, name?: string): Promise<SessionInfo> {
+  return apiFetch("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, name }),
+  });
+}
+
 export function smartAuthorize(
   iss: string,
   launch?: string | null,
@@ -431,8 +438,8 @@ export interface UserSearchResult {
   role: string;
 }
 
-export function searchUsers(q: string, limit = 20): Promise<UserSearchResult[]> {
-  const qs = new URLSearchParams({ q, limit: String(limit) });
+export function searchUsers(studyId: string, q: string, limit = 20): Promise<UserSearchResult[]> {
+  const qs = new URLSearchParams({ q, limit: String(limit), study_id: studyId });
   return apiFetch(`/api/studies/_users/search?${qs.toString()}`);
 }
 

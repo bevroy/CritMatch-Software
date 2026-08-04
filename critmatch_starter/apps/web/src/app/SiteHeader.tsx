@@ -47,7 +47,8 @@ const PAGE_INFO: Record<string, PageInfo> = {
   "/user-guide": { title: "User Guide", subtitle: "Step-by-step module workflows in navigation order." },
   "/technical": { title: "Technical", subtitle: "Architecture, stack, integrations, and deployment details." },
   "/audit": { title: "Audit", subtitle: "Review audit log entries across the platform." },
-  "/launch": { title: "Sign In", subtitle: "Authenticate to access CritMatch." },
+  "/login": { title: "Sign In", subtitle: "Authenticate to access CritMatch." },
+  "/launch": { title: "SMART Launch", subtitle: "Authenticate from your EHR context." },
   "/auth": { title: "Authentication", subtitle: "Completing sign in…" },
   "/builder": { title: "Cohort Builder", subtitle: "Define inclusion and exclusion rules with terminology expansion." },
 };
@@ -180,7 +181,7 @@ export default function SiteHeader() {
                 </>
               ) : loaded ? (
                 <Link
-                  href="/launch"
+                  href="/login"
                   className="button-secondary"
                   style={{ padding: "0.35rem 0.85rem", fontSize: "0.82rem" }}
                 >

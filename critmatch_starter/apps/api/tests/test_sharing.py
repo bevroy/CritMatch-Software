@@ -179,11 +179,12 @@ def test_remove_collaborator(client, db_session):
 
 def test_user_search(client, db_session):
     user = _make_user(db_session, name="Searcher")
+    study = _make_study(db_session, user)
     _make_user(db_session, name="Findable Person")
     _make_user(db_session, name="Other")
 
     _client_for(client, user)
-    resp = client.get("/api/studies/_users/search?q=findable")
+    resp = client.get(f"/api/studies/_users/search?q=findable&study_id={study.id}")
     assert resp.status_code == 200, resp.text
     items = resp.json()
     assert any("Findable" in u["name"] for u in items)

@@ -17,6 +17,18 @@ supports ``a.b.c`` and ``[N]`` indexing (e.g. ``component[0].valueQuantity.value
 
 For Patient demographics we accept ``{"resource": "Patient", "extract": "..."}``
 without ``params`` and read by id.
+
+PATCHED (audit fix, high): the ``unit`` mapping key was documented above but
+never actually read - ``pull_field_value`` extracted the raw numeric value
+and stored it as-is with no check against the unit actually present on the
+source Quantity. If a FHIR server records a value in a different unit than
+the study expects (mg/dL vs mmol/L, kg vs lb, etc.), the number would be
+pulled and persisted silently wrong. There's no safe generic fix - unit
+conversion needs a real per-unit-pair table, not a guess - so this now
+fails closed: when a mapping declares an expected unit and the source
+Quantity's own unit/code disagrees, the pull errors out instead of silently
+storing a wrongly-scaled number. Mappings with no declared unit, or sources
+with no unit field to compare against, are unaffected.
 """
 
 from __future__ import annotations
@@ -60,8 +72,10 @@ def pull_field_value(
 ) -> tuple[Any, str | None]:
     """Return ``(value, source_ref)`` for a single field.
 
-    Raises ``ValueError`` if the mapping is malformed. Returns
-    ``(None, None)`` when the EMR has no matching resource.
+    Raises ``ValueError`` if the mapping is malformed, or (PATCHED) if the
+    mapping declares an expected unit that disagrees with the source
+    Quantity's own unit. Returns ``(None, None)`` when the EMR has no
+    matching resource.
     """
 
     resource = (mapping or {}).get("resource")
@@ -84,13 +98,36 @@ def pull_field_value(
     params.setdefault("_count", "1")
 
     chosen: dict[str, Any] | None = None
-    for entry in client.search(resource, params, page_limit=1):
+    # PATCHED (audit fix): explicit on_limit="truncate" - this call already
+    # scopes the search tightly (_count=1, page_limit=1) and only wants a
+    # best-effort single most-recent value, not an exhaustive result set, so
+    # the new FHIRSearchTruncated-by-default behavior in fhir/client.py
+    # would be the wrong choice here. See that module's docstring.
+    for entry in client.search(resource, params, page_limit=1, on_limit="truncate"):
         chosen = entry
         break
     if chosen is None:
         return None, None
     src_ref = f"{resource}/{chosen.get('id', '')}".rstrip("/")
-    return _extract(chosen, extract), src_ref
+
+    value = _extract(chosen, extract)
+
+    expected_unit = mapping.get("unit")
+    if expected_unit and extract.endswith("valueQuantity.value"):
+        qty_path = extract.rsplit(".value", 1)[0]
+        quantity_obj = _extract(chosen, qty_path)
+        actual_unit = None
+        if isinstance(quantity_obj, dict):
+            actual_unit = quantity_obj.get("unit") or quantity_obj.get("code")
+        if actual_unit and actual_unit != expected_unit:
+            raise ValueError(
+                f"Unit mismatch pulling {resource}: field mapping expects '{expected_unit}', "
+                f"but the source Quantity has unit '{actual_unit}'. Refusing to guess a "
+                "conversion - update the field mapping's expected unit, or convert at the "
+                "source system, before this field can be pulled automatically."
+            )
+
+    return value, src_ref
 
 
 def pull_all_for_entry(

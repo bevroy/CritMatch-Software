@@ -1,3 +1,6 @@
+# PATCHED (audit fix, medium): added `index=True` on selected foreign-key
+# columns frequently used for scoping/filtering. Existing Postgres databases
+# still need an Alembic migration to materialize these indexes.
 import uuid
 from datetime import datetime
 
@@ -146,7 +149,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), index=True)
     action: Mapped[str] = mapped_column(Text, nullable=False)
     object_type: Mapped[str] = mapped_column(Text, nullable=False)
     object_id: Mapped[str | None] = mapped_column(Text)
@@ -176,7 +179,7 @@ class Notification(Base):
 # A feasibility "questionnaire" is a collection of questions a researcher
 # would typically answer on a study feasibility form (e.g. "How many adult
 # patients with type 2 diabetes do you see per year?"). Each question is
-# evaluated against the EMR via FHIR and produces an aggregate count — the
+# evaluated against the EMR via FHIR and produces an aggregate count - the
 # module deliberately does NOT persist patient ids, since feasibility is an
 # aggregate workflow and aggregate-only avoids new PHI surface area.
 # ---------------------------------------------------------------------------
@@ -336,7 +339,7 @@ class StudyParticipant(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     study_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("studies.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("studies.id", ondelete="CASCADE"), nullable=False, index=True
     )
     # FHIR Patient.id on the configured server.
     patient_id: Mapped[str] = mapped_column(Text, nullable=False)
@@ -363,10 +366,10 @@ class EdcEntry(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     form_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("edc_forms.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("edc_forms.id", ondelete="CASCADE"), nullable=False, index=True
     )
     participant_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("study_participants.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("study_participants.id", ondelete="CASCADE"), nullable=False, index=True
     )
     # in_progress | complete | locked
     status: Mapped[str] = mapped_column(Text, nullable=False, default="in_progress")
@@ -394,7 +397,7 @@ class EdcEntryField(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     entry_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("edc_entries.id", ondelete="CASCADE"), nullable=False
+        ForeignKey("edc_entries.id", ondelete="CASCADE"), nullable=False, index=True
     )
     field_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("edc_fields.id", ondelete="CASCADE"), nullable=False
@@ -447,7 +450,7 @@ class EdcSignature(Base):
 
 
 # ============================================================================
-# CTFMS module — Clinical Trial Financial Management
+# CTFMS module - Clinical Trial Financial Management
 # ============================================================================
 
 
@@ -514,7 +517,9 @@ class CtfmsAccrual(Base):
     __tablename__ = "ctfms_accruals"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    study_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("studies.id", ondelete="CASCADE"), nullable=False)
+    study_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("studies.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     budget_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("ctfms_budgets.id", ondelete="CASCADE"), nullable=False)
     budget_item_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("ctfms_budget_items.id", ondelete="CASCADE"), nullable=False
@@ -524,7 +529,7 @@ class CtfmsAccrual(Base):
     )
     # Optional EDC source pointer (entry that triggered the accrual)
     entry_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("edc_entries.id", ondelete="SET NULL")
+        ForeignKey("edc_entries.id", ondelete="SET NULL"), index=True
     )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     unit_price: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # snapshot

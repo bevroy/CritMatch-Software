@@ -1,3 +1,8 @@
+> **PATCHED (audit note, no code change):** this directory is an older,
+> undeployed prototype - it is not referenced by the root `render.yaml` or
+> `netlify.toml`, and `critmatch_starter/` is the actual deployed
+> application. It's kept here for reference only.
+
 # CritMatch MVP Starter
 
 This is a repo-ready MVP architecture for CritMatch under Elionyx Health.

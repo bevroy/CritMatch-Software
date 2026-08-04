@@ -7,7 +7,7 @@ Criteria logic is stored in ``criteria_sets.logic_json`` using this shape::
       "rules": [
         {
           "id": "rule-1",
-          "kind": "condition",     # condition | observation | demographic
+          "kind": "condition",     # condition | observation | medication | demographic
           "label": "Type 2 diabetes",
           "codes": [
             {"system": "http://hl7.org/fhir/sid/icd-10-cm", "code": "E11"}
@@ -25,6 +25,50 @@ Criteria logic is stored in ``criteria_sets.logic_json`` using this shape::
 
 The executor walks the rules, queries the FHIR server, and records every
 matched patient + the rules that matched.
+
+PATCHED (audit fix) - three correctness bugs fixed here, all silent before
+this patch:
+
+1. The ``demographic`` branch called ``self.fhir.search("Patient", {})``
+   with zero filters - the entire Patient compartment. Combined with
+   ``FHIRClient.search()``'s ``page_limit=20`` cap, any criteria set with an
+   age/gender rule (nearly all of them) could silently see only the first
+   <=20 pages of patients. ``fhir/client.py`` now raises
+   ``FHIRSearchTruncated`` by default when that cap is hit instead of
+   silently stopping, and this module intentionally does NOT catch that
+   exception - it's meant to propagate up through ``execute()`` into
+   ``run_query()``'s existing generic exception handler, which already
+   marks the run ``failed`` and records the error. A failed run is a far
+   better outcome than a silently wrong "completed" one for a product whose
+   purpose is producing correct match/count numbers.
+2. ``medication`` was documented in ``CriteriaSet``'s own schema
+   (condition | observation | medication | demographic) but had no branch
+   in ``_patients_matching()`` - it fell through to ``return set()``. Under
+   AND logic that silently zeroed the *entire* result for any criteria set
+   containing a medication rule, while ``QueryRun.status`` still read
+   "completed". Added a branch searching ``MedicationRequest`` by code,
+   mirroring the ``condition``/``observation`` pattern. Note: this assumes
+   active medications are represented as ``MedicationRequest`` on the
+   target FHIR server: if a given EHR primarily uses ``MedicationStatement``
+   instead, this branch will need a second search against that resource
+   type too - flagged here rather than guessed, since which resource type a
+   given FHIR server actually populates is deployment-specific.
+3. ``observation`` rules matched on code presence only - any patient with a
+   matching-coded Observation on file counted as a match regardless of its
+   value, so "HbA1c > 7" actually matched anyone who'd ever had an HbA1c
+   drawn. Now reads the same ``op``/``value`` fields the ``demographic``
+   branch already supports and compares against ``valueQuantity.value``
+   when both are present, falling back to code-presence matching (the
+   original behavior) only when a rule genuinely doesn't specify a
+   threshold - e.g. "has a diagnosis-relevant lab on file at all" is a
+   legitimate criterion shape too, so that fallback is kept, just no longer
+   the *only* option.
+
+Also added: an explicit error for any ``kind`` outside the four documented
+values, instead of the previous silent ``return set()`` (which, under AND
+logic, would have zeroed the whole result with no indication why - the same
+failure shape as bug #2, just for a typo'd or future/unsupported kind
+rather than a known-missing one).
 """
 
 from __future__ import annotations
@@ -41,6 +85,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models import CriteriaSet, QueryResult, QueryRun
 from app.fhir.client import FHIRClient
+
+_KNOWN_RULE_KINDS = {"condition", "observation", "medication", "demographic"}
 
 
 def _current_status(db: Session, run_id) -> str | None:
@@ -82,7 +128,10 @@ def _evaluate_demographic(rule: dict[str, Any], patient: dict[str, Any]) -> bool
             born = date.fromisoformat(birth[:10])
         except ValueError:
             return False
-        today = date.today()
+        # PATCHED (audit fix, low severity): use a UTC-anchored date rather
+        # than the server's local date, so age calculation doesn't depend on
+        # server timezone configuration.
+        today = datetime.utcnow().date()
         age = today.year - born.year - ((today.month, today.day) < (born.month, born.day))
         return _compare(age, op, value)
     if field == "gender":
@@ -154,6 +203,17 @@ class QueryExecutor:
     # ------------------------------------------------------------------
     def _patients_matching(self, rule: dict[str, Any]) -> set[str]:
         kind = rule.get("kind")
+
+        if kind not in _KNOWN_RULE_KINDS:
+            # PATCHED (audit fix): previously fell through to `return set()`
+            # for any unrecognized kind, which - under AND logic - silently
+            # zeroed the entire criteria set's result with no indication why.
+            # Fail loud instead; this propagates up to run_query()'s
+            # existing exception handler, which marks the run "failed".
+            raise QueryExecutionError(
+                f"Unknown rule kind {kind!r}; expected one of {sorted(_KNOWN_RULE_KINDS)}"
+            )
+
         if kind == "condition":
             value = _coding_param(rule.get("codes", []))
             if not value:
@@ -164,24 +224,54 @@ class QueryExecutor:
                 if pid:
                     ids.add(pid)
             return ids
-        if kind == "observation":
+
+        if kind == "medication":
+            # PATCHED (audit fix): previously unimplemented - see module
+            # docstring for the MedicationRequest-vs-MedicationStatement
+            # caveat.
             value = _coding_param(rule.get("codes", []))
             if not value:
                 return set()
             ids = set()
-            for resource in self.fhir.search("Observation", {"code": value}):
+            for resource in self.fhir.search("MedicationRequest", {"code": value}):
                 pid = _patient_id_from_subject((resource.get("subject") or {}).get("reference"))
                 if pid:
                     ids.add(pid)
             return ids
-        if kind == "demographic":
+
+        if kind == "observation":
+            value = _coding_param(rule.get("codes", []))
+            if not value:
+                return set()
+            op = rule.get("op")
+            threshold = rule.get("value")
             ids = set()
-            for resource in self.fhir.search("Patient", {}):
-                pid = resource.get("id")
-                if pid and _evaluate_demographic(rule, resource):
+            for resource in self.fhir.search("Observation", {"code": value}):
+                pid = _patient_id_from_subject((resource.get("subject") or {}).get("reference"))
+                if not pid:
+                    continue
+                if op is None or threshold is None:
+                    # PATCHED (audit fix): no threshold specified on this
+                    # rule - presence of a matching-coded observation is the
+                    # criterion (e.g. "has an HbA1c result on file"). This
+                    # is a legitimate rule shape, kept as a fallback.
+                    ids.add(pid)
+                    continue
+                # PATCHED (audit fix): compare the actual result value
+                # against the rule's threshold instead of matching on code
+                # presence alone.
+                obs_value = (resource.get("valueQuantity") or {}).get("value")
+                if obs_value is not None and _compare(obs_value, op, threshold):
                     ids.add(pid)
             return ids
-        return set()
+
+        # kind == "demographic"
+        ids = set()
+        for resource in self.fhir.search("Patient", {}):
+            pid = resource.get("id")
+            if pid and _evaluate_demographic(rule, resource):
+                ids.add(pid)
+        return ids
 
 
 def run_query(db: Session, run_id: str, *, fhir_client: FHIRClient | None = None) -> int:
@@ -255,7 +345,3 @@ def run_query(db: Session, run_id: str, *, fhir_client: FHIRClient | None = None
 
 
 __all__ = ["QueryExecutor", "QueryExecutionError", "run_query"]
-
-
-# Silence "datetime" unused warning if linters don't see it; kept for future use.
-_ = datetime

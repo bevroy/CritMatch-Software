@@ -2,6 +2,11 @@
 
 All environment variables are read here so the rest of the codebase can
 import typed settings instead of sprinkling ``os.getenv`` calls.
+
+PATCHED (audit fix): added ``dev_login_secret`` (optional, backward
+compatible - see routes/auth.py) and ``allow_unverified_smart_id_token``
+(replaces an ``is_production``-only check in routes/auth.py's
+smart_callback - see that file for the full rationale).
 """
 
 from __future__ import annotations
@@ -59,6 +64,16 @@ class Settings:
     )
     smart_redirect_uri: str = field(default_factory=lambda: os.getenv("SMART_REDIRECT_URI", ""))
     fhir_base_url: str = field(default_factory=lambda: os.getenv("FHIR_BASE_URL", ""))
+    # Allowed email domains for first-party email login and SMART users
+    # whose id_token contains an email claim.
+    login_email_domain_allowlist: list[str] = field(
+        default_factory=lambda: _split_csv(
+            os.getenv(
+                "LOGIN_EMAIL_DOMAIN_ALLOWLIST",
+                "critmatchresearch.com,elionyxhealth.com",
+            )
+        )
+    )
 
     # Export signing
     export_signing_key: str = field(
@@ -73,10 +88,28 @@ class Settings:
     dev_login_allow_prod: bool = field(
         default_factory=lambda: os.getenv("DEV_LOGIN_ALLOW_PROD", "0") in {"1", "true", "True"}
     )
+    # PATCHED (audit fix): optional shared secret required by /dev-login
+    # when set. Empty by default - no behavior change unless an operator
+    # opts in.
+    dev_login_secret: str = field(
+        default_factory=lambda: os.getenv("DEV_LOGIN_SECRET", "")
+    )
 
     @property
     def is_production(self) -> bool:
         return self.app_env.lower() in {"production", "prod"}
+
+    @property
+    def allow_unverified_smart_id_token(self) -> bool:
+        """PATCHED (audit fix): explicit allowlist of environments that may
+        accept a SMART id_token whose signature couldn't be verified
+        (issuer JWKS unreachable), instead of the previous
+        production-vs-everything-else check. Any APP_ENV value not in this
+        set - most importantly "staging"/"qa"-style environments that often
+        share real SMART credentials with production - now requires real
+        signature verification.
+        """
+        return self.app_env.lower() in {"local", "development", "dev", "test"}
 
     @property
     def allowed_origins(self) -> list[str]:
