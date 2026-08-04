@@ -188,7 +188,7 @@ export default function SiteHeader() {
                 >
                   Sign in
                 </Link>
-              ) : null}
+              )}
             </div>
           </div>
           {navOpen && (
