@@ -3,8 +3,8 @@ import "./globals.css";
 import SiteHeader from "./SiteHeader";
 
 export const metadata: Metadata = {
-  title: "CritMatch | Community Clinical Research Platform",
-  description: "CritMatch is a community-focused platform for equitable clinical research participation.",
+  title: "CritMatch | Clinical Research Platform",
+  description: "CritMatch is a platform for equitable clinical research participation.",
   icons: {
     icon: "/critmatch-logo.png",
     apple: "/critmatch-logo.png",

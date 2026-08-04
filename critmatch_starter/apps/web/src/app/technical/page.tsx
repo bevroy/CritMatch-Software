@@ -4,7 +4,6 @@ const MODULES = [
   { name: "Feasibility", api: "/api/feasibility + /api/terminology" },
   { name: "ROIE", api: "/api/roie" },
   { name: "Readiness", api: "/api/readiness" },
-  { name: "Community", api: "/api/community" },
   { name: "Navigator", api: "/api/navigator" },
   { name: "Equity", api: "/api/equity" },
   { name: "EDC", api: "/api/edc" },

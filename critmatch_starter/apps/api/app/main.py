@@ -5,7 +5,6 @@ from app.core.config import get_settings
 from app.routes import (
     audit,
     auth,
-    community,
     ctfms,
     edc,
     equity,
@@ -45,7 +44,6 @@ app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(fhir.router, prefix="/api/fhir", tags=["fhir"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(feasibility.router, prefix="/api/feasibility", tags=["feasibility"])
-app.include_router(community.router, prefix="/api/community", tags=["community"])
 app.include_router(navigator.router, prefix="/api/navigator", tags=["navigator"])
 app.include_router(equity.router, prefix="/api/equity", tags=["equity"])
 app.include_router(readiness.router, prefix="/api/readiness", tags=["readiness"])

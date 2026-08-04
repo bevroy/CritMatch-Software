@@ -670,35 +670,6 @@ export function fetchReadinessProfile(): Promise<ReadinessProfile> {
   return apiFetch("/api/readiness/profile");
 }
 
-/* ── Community Partner Network ── */
-
-export interface CommunityPartner {
-  id: string;
-  name: string;
-  kind: string;
-  city: string;
-  state: string;
-  languages: string[];
-  activeReferrals: number;
-  enrolledParticipants: number;
-  lastActivity: string;
-}
-
-export interface CommunitySummary {
-  partnerCount: number;
-  activeReferrals: number;
-  enrolledParticipants: number;
-  topLanguageNeeds: string[];
-}
-
-export function fetchCommunityPartners(): Promise<CommunityPartner[]> {
-  return apiFetch("/api/community/partners");
-}
-
-export function fetchCommunitySummary(): Promise<CommunitySummary> {
-  return apiFetch("/api/community/summary");
-}
-
 /* ── Navigator Workspace ── */
 
 export interface NavigatorTask {

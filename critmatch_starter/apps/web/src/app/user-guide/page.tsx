@@ -72,17 +72,6 @@ const GUIDE_SECTIONS: GuideSection[] = [
     notes: "Readiness is currently a read-only dashboard.",
   },
   {
-    title: "Community",
-    id: "community",
-    steps: [
-      "Open Community to review partner network activity.",
-      "Check summary metrics for partners, referrals, and enrollments.",
-      "Use Refresh to update current network data.",
-      "Review partner table details including location, language coverage, and activity.",
-    ],
-    notes: "Community is currently a read-only dashboard.",
-  },
-  {
     title: "Navigator",
     id: "navigator",
     steps: [

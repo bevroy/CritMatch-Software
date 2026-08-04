@@ -1,4 +1,4 @@
-"""Community navigator workflow placeholder endpoints."""
+"""Navigator workflow placeholder endpoints."""
 
 from __future__ import annotations
 
