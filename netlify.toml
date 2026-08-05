@@ -1,7 +1,9 @@
-# PATCHED (audit fix, medium - informational only, no behavior change):
-# this file and critmatch_starter/apps/web/netlify.toml disagree with each
-# other. Confirm which one the live Netlify site actually uses, then remove
-# the other to avoid accidental config drift.
+# PATCHED (audit fix, high): confirmed via the Netlify dashboard that this
+# is the config actually in use (site base directory is "/"). It previously
+# pointed the browser directly at the cross-origin Render API with no
+# proxy, which silently breaks the SameSite=Lax session cookie on every
+# authenticated request. Now proxies /api/* same-origin like the (now
+# removed) critmatch_starter/apps/web/netlify.toml did.
 [build]
   base = "critmatch_starter/apps/web"
   command = "npm run build"
@@ -9,7 +11,18 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NEXT_PUBLIC_API_BASE_URL = "https://critmatch-api-2106.onrender.com"
+  # Make all client fetches go through Netlify so the session cookie is
+  # first-party (avoids third-party cookie blocking).
+  NEXT_PUBLIC_API_BASE_URL = ""
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Proxy /api/* to the Render API. status=200 + force=true performs a
+# transparent server-side rewrite so the browser sees the request as
+# same-origin with Netlify.
+[[redirects]]
+  from = "/api/*"
+  to = "https://critmatch-api-2106.onrender.com/api/:splat"
+  status = 200
+  force = true
