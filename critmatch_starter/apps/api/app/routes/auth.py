@@ -32,12 +32,12 @@ an empty allowlist rejects every issuer instead of allowing all of them.
 
 from __future__ import annotations
 
-import time
 import uuid
 import base64
 import hashlib
 import hmac
 import secrets
+from datetime import datetime, timedelta
 from email.utils import parseaddr
 from typing import Any
 
@@ -53,7 +53,7 @@ from app.core.security import (
     issue_session_token,
     verify_smart_id_token,
 )
-from app.db.models import User
+from app.db.models import OAuthState, User
 from app.db.session import get_db
 from app.deps.auth import CurrentUser
 from app.services.audit_service import record as record_audit
@@ -71,25 +71,49 @@ SMART_REQUESTED_SCOPE = (
     "offline_access"
 )
 
-# In-memory state store. For multi-instance deployments swap for Redis or DB.
-_state_store: dict[str, dict[str, Any]] = {}
+# PATCHED (audit fix): was an in-process dict - flagged in this module's own
+# docstring as single-instance-only, since a /authorize and its later
+# /callback landing on different API instances (or the process restarting
+# in between) would lose the state. Now backed by the oauth_states table
+# (see app/db/models.py::OAuthState and alembic 0010_oauth_state).
 _STATE_TTL_SECONDS = 600
 
 
-def _store_state(state: str, payload: dict[str, Any]) -> None:
-    payload["_expires"] = time.time() + _STATE_TTL_SECONDS
-    _state_store[state] = payload
-    now = time.time()
-    expired = [k for k, v in _state_store.items() if v.get("_expires", 0) < now]
-    for k in expired:
-        _state_store.pop(k, None)
+def _store_state(db: Session, state: str, payload: dict[str, Any]) -> None:
+    now = datetime.utcnow()
+    # Opportunistic sweep of expired rows on every write - mirrors the old
+    # in-memory store's behavior, keeps the table from growing unbounded.
+    db.query(OAuthState).filter(OAuthState.expires_at < now).delete()
+    db.add(
+        OAuthState(
+            state=state,
+            iss=payload["iss"],
+            token_endpoint=payload["token_endpoint"],
+            jwks_uri=payload.get("jwks_uri"),
+            code_verifier=payload["code_verifier"],
+            expires_at=now + timedelta(seconds=_STATE_TTL_SECONDS),
+        )
+    )
+    db.commit()
 
 
-def _consume_state(state: str) -> dict[str, Any] | None:
-    payload = _state_store.pop(state, None)
-    if not payload or payload.get("_expires", 0) < time.time():
+def _consume_state(db: Session, state: str) -> dict[str, Any] | None:
+    row = db.get(OAuthState, state)
+    if row is None:
         return None
-    return payload
+    # Always one-time-use, whether or not it turns out to be expired -
+    # matches the old dict store's unconditional ``.pop()``.
+    expired = row.expires_at < datetime.utcnow()
+    db.delete(row)
+    db.commit()
+    if expired:
+        return None
+    return {
+        "iss": row.iss,
+        "token_endpoint": row.token_endpoint,
+        "jwks_uri": row.jwks_uri,
+        "code_verifier": row.code_verifier,
+    }
 
 
 class AuthorizeRequest(BaseModel):
@@ -286,7 +310,7 @@ def email_login(
 
 
 @router.post("/smart/authorize", response_model=AuthorizeResponse)
-def smart_authorize(payload: AuthorizeRequest) -> AuthorizeResponse:
+def smart_authorize(payload: AuthorizeRequest, db: Session = Depends(get_db)) -> AuthorizeResponse:
     settings = get_settings()
     if not settings.smart_client_id:
         raise HTTPException(status_code=503, detail="SMART_CLIENT_ID not configured")
@@ -319,6 +343,7 @@ def smart_authorize(payload: AuthorizeRequest) -> AuthorizeResponse:
     state = generate_state()
     verifier, challenge = generate_pkce_pair()
     _store_state(
+        db,
         state,
         {
             "iss": payload.iss,
@@ -356,7 +381,7 @@ def smart_callback(
     if not settings.smart_client_id or not settings.smart_client_secret:
         raise HTTPException(status_code=503, detail="SMART credentials not configured")
 
-    state_data = _consume_state(payload.state)
+    state_data = _consume_state(db, payload.state)
     if not state_data:
         raise HTTPException(status_code=400, detail="Unknown or expired state")
 

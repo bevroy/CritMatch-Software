@@ -117,6 +117,27 @@ class TerminologyExpansion(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
 
+class OAuthState(Base):
+    """Short-lived SMART launch ``state`` + PKCE ``code_verifier``.
+
+    Replaces routes/auth.py's old in-process dict, which the module's own
+    docstring flagged as single-instance-only - a /authorize and its later
+    /callback landing on different API instances (or the process restarting
+    between the two) would lose the state. ``state`` itself (already an
+    opaque random token - see ``generate_state()``) is the primary key.
+    """
+
+    __tablename__ = "oauth_states"
+
+    state: Mapped[str] = mapped_column(Text, primary_key=True)
+    iss: Mapped[str] = mapped_column(Text, nullable=False)
+    token_endpoint: Mapped[str] = mapped_column(Text, nullable=False)
+    jwks_uri: Mapped[str | None] = mapped_column(Text)
+    code_verifier: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class QueryRun(Base):
     __tablename__ = "query_runs"
 
