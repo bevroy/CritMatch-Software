@@ -41,18 +41,30 @@ this patch:
    marks the run ``failed`` and records the error. A failed run is a far
    better outcome than a silently wrong "completed" one for a product whose
    purpose is producing correct match/count numbers.
+   UPDATE: the demographic branch now also pushes whatever it can down to
+   the server as real FHIR search params (``birthdate=le/lt/ge/gt...`` for
+   ``age`` comparisons, ``gender=`` for an exact ``gender`` match - see
+   ``_demographic_search_params()``) instead of always fetching the entire
+   compartment, and uses a higher ``page_limit`` (``_DEMOGRAPHIC_PAGE_LIMIT``)
+   for whatever can't be narrowed server-side (e.g. ``==``/``!=`` on age).
+   ``_evaluate_demographic()`` still re-checks every resource returned, so an
+   inexact or missing server-side mapping only costs extra fetched pages, not
+   a correctness bug - and ``FHIRSearchTruncated`` still fires, unchanged, if
+   even the raised limit isn't enough.
 2. ``medication`` was documented in ``CriteriaSet``'s own schema
    (condition | observation | medication | demographic) but had no branch
    in ``_patients_matching()`` - it fell through to ``return set()``. Under
    AND logic that silently zeroed the *entire* result for any criteria set
    containing a medication rule, while ``QueryRun.status`` still read
    "completed". Added a branch searching ``MedicationRequest`` by code,
-   mirroring the ``condition``/``observation`` pattern. Note: this assumes
-   active medications are represented as ``MedicationRequest`` on the
-   target FHIR server: if a given EHR primarily uses ``MedicationStatement``
-   instead, this branch will need a second search against that resource
-   type too - flagged here rather than guessed, since which resource type a
-   given FHIR server actually populates is deployment-specific.
+   mirroring the ``condition``/``observation`` pattern.
+   UPDATE: some EHRs (including some Epic/Cerner configurations) populate
+   active medications primarily via ``MedicationStatement`` rather than
+   ``MedicationRequest`` - originally flagged here as a known gap rather
+   than guessed at, since which resource type a given FHIR server actually
+   populates is deployment-specific. The ``medication`` branch now searches
+   both resource types and unions the matched patient ids, so a criteria
+   set matches regardless of which resource type the source EHR uses.
 3. ``observation`` rules matched on code presence only - any patient with a
    matching-coded Observation on file counted as a match regardless of its
    value, so "HbA1c > 7" actually matched anyone who'd ever had an HbA1c
@@ -63,6 +75,19 @@ this patch:
    threshold - e.g. "has a diagnosis-relevant lab on file at all" is a
    legitimate criterion shape too, so that fallback is kept, just no longer
    the *only* option.
+   UPDATE: ``observation`` rules also matched on ``code`` alone with no
+   check on ``Observation.category``, so a code that coincidentally also
+   appears on an unrelated-category Observation (e.g. a survey/imaging
+   resource reusing the same LOINC code as a vital-signs one) could produce
+   a false match. Rules may now set an optional ``category`` - either a bare
+   US Core category code (``"vital-signs"``, ``"laboratory"``,
+   ``"social-history"``, etc, assumed to be in
+   ``http://terminology.hl7.org/CodeSystem/observation-category``) or an
+   explicit ``{"system", "code"}`` mapping - and a candidate Observation must
+   carry that coding in ``category`` to count. When a rule doesn't specify a
+   category, this deliberately does NOT guess one: falls back to the
+   original code-only behavior, since inventing a category filter could
+   wrongly exclude otherwise-valid matches.
 
 Also added: an explicit error for any ``kind`` outside the four documented
 values, instead of the previous silent ``return set()`` (which, under AND
@@ -88,6 +113,12 @@ from app.fhir.client import FHIRClient
 
 _KNOWN_RULE_KINDS = {"condition", "observation", "medication", "demographic"}
 
+# Demographic Patient searches can't always be narrowed server-side (e.g. an
+# exact age match, or a FHIR server that ignores unrecognized params), so this
+# path gets a higher bound than FHIRClient.search()'s default page_limit=20 -
+# still bounded, and FHIRSearchTruncated still fires if even this is exceeded.
+_DEMOGRAPHIC_PAGE_LIMIT = 200
+
 
 def _current_status(db: Session, run_id) -> str | None:
     """Read just the current status without disturbing the in-memory instance."""
@@ -112,7 +143,14 @@ def _coding_param(codes: Iterable[dict[str, str]]) -> str:
 
 
 def _hash_mrn(patient_id: str) -> str:
-    salt = os.getenv("MRN_HASH_SALT", "")
+    # PATCHED (audit fix): fail closed instead of silently hashing with an
+    # empty salt - matches the SESSION_SECRET/EXPORT_SIGNING_KEY pattern used
+    # elsewhere in this codebase. An unsalted sha256 of a patient id is
+    # guessable for small id spaces, so refuse rather than produce a
+    # weakly-hashed mrn_hash.
+    salt = os.getenv("MRN_HASH_SALT")
+    if not salt:
+        raise QueryExecutionError("MRN_HASH_SALT not configured; refusing to hash patient identifiers")
     return hashlib.sha256((salt + ":" + patient_id).encode()).hexdigest()
 
 
@@ -167,6 +205,78 @@ def _patient_id_from_subject(reference: str | None) -> str | None:
     if "Patient/" in reference:
         return reference.split("Patient/", 1)[1].split("?")[0]
     return None
+
+
+_OBSERVATION_CATEGORY_SYSTEM = "http://terminology.hl7.org/CodeSystem/observation-category"
+
+
+def _normalize_expected_category(category: Any) -> tuple[str | None, str] | None:
+    """Return ``(system_or_None, code)`` for a rule's expected observation
+    category, or ``None`` if the rule didn't specify one.
+
+    Accepts either a bare code string (assumed to be in the standard US Core
+    ``observation-category`` system) or an explicit ``{"system", "code"}``
+    mapping for callers that need a non-standard category system.
+    """
+    if not category:
+        return None
+    if isinstance(category, str):
+        return (_OBSERVATION_CATEGORY_SYSTEM, category)
+    if isinstance(category, dict):
+        code = category.get("code")
+        if not code:
+            return None
+        return (category.get("system") or None, code)
+    return None
+
+
+def _observation_has_category(resource: dict[str, Any], expected: tuple[str | None, str]) -> bool:
+    """True if ``resource["category"]`` contains a coding matching ``expected``."""
+    expected_system, expected_code = expected
+    for category in resource.get("category", []) or []:
+        for coding in category.get("coding", []) or []:
+            if coding.get("code") != expected_code:
+                continue
+            if expected_system is None or coding.get("system") == expected_system:
+                return True
+    return False
+
+
+def _demographic_search_params(rule: dict[str, Any]) -> dict[str, str]:
+    """Best-effort real FHIR search params to narrow a demographic Patient
+    search server-side, instead of always fetching the whole compartment.
+
+    Purely an optimization: the caller still re-checks every resource
+    returned via ``_evaluate_demographic()``, so a rule shape this can't
+    map (e.g. an exact age match, or an unrecognized ``field``) just falls
+    back to fetching more broadly - never a correctness bug.
+    """
+    field = rule.get("field")
+    op = rule.get("op", "==")
+    value = rule.get("value")
+
+    if field == "gender" and op == "==" and value:
+        return {"gender": str(value)}
+
+    if field == "age":
+        # age <op> N <=> birthDate <inverted-op> (today - N years); e.g.
+        # "age >= 18" means born on or before 18 years ago, i.e. birthdate<=cutoff.
+        prefix = {">=": "le", ">": "lt", "<=": "ge", "<": "gt"}.get(op)
+        if prefix is None:
+            return {}
+        try:
+            age_years = int(value)
+        except (TypeError, ValueError):
+            return {}
+        today = datetime.utcnow().date()
+        try:
+            cutoff = today.replace(year=today.year - age_years)
+        except ValueError:
+            # Feb 29 birthday with no Feb 29 in the cutoff year.
+            cutoff = today.replace(month=2, day=28, year=today.year - age_years)
+        return {"birthdate": f"{prefix}{cutoff.isoformat()}"}
+
+    return {}
 
 
 class QueryExecutor:
@@ -226,17 +336,20 @@ class QueryExecutor:
             return ids
 
         if kind == "medication":
-            # PATCHED (audit fix): previously unimplemented - see module
-            # docstring for the MedicationRequest-vs-MedicationStatement
-            # caveat.
+            # PATCHED (audit fix): searches both MedicationRequest and
+            # MedicationStatement - see module docstring. Matches are merged
+            # by adding to the same patient-id set, so a patient represented
+            # in both resource types is naturally deduplicated (not a double
+            # count), and a patient found via either resource type matches.
             value = _coding_param(rule.get("codes", []))
             if not value:
                 return set()
             ids = set()
-            for resource in self.fhir.search("MedicationRequest", {"code": value}):
-                pid = _patient_id_from_subject((resource.get("subject") or {}).get("reference"))
-                if pid:
-                    ids.add(pid)
+            for resource_type in ("MedicationRequest", "MedicationStatement"):
+                for resource in self.fhir.search(resource_type, {"code": value}):
+                    pid = _patient_id_from_subject((resource.get("subject") or {}).get("reference"))
+                    if pid:
+                        ids.add(pid)
             return ids
 
         if kind == "observation":
@@ -245,8 +358,17 @@ class QueryExecutor:
                 return set()
             op = rule.get("op")
             threshold = rule.get("value")
+            expected_category = _normalize_expected_category(rule.get("category"))
             ids = set()
             for resource in self.fhir.search("Observation", {"code": value}):
+                if expected_category is not None and not _observation_has_category(
+                    resource, expected_category
+                ):
+                    # PATCHED (audit fix): the rule specified which category
+                    # it expects (e.g. vital-signs) and this Observation's
+                    # code matched but its category didn't - a coincidental
+                    # cross-category code collision, not a real match.
+                    continue
                 pid = _patient_id_from_subject((resource.get("subject") or {}).get("reference"))
                 if not pid:
                     continue
@@ -266,8 +388,11 @@ class QueryExecutor:
             return ids
 
         # kind == "demographic"
+        search_params = _demographic_search_params(rule)
         ids = set()
-        for resource in self.fhir.search("Patient", {}):
+        for resource in self.fhir.search(
+            "Patient", search_params, page_limit=_DEMOGRAPHIC_PAGE_LIMIT
+        ):
             pid = resource.get("id")
             if pid and _evaluate_demographic(rule, resource):
                 ids.add(pid)

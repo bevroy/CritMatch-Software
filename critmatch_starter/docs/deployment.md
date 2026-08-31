@@ -23,7 +23,8 @@ Recommended manual env vars in Render:
 - `SMART_CLIENT_ID`
 - `SMART_CLIENT_SECRET`
 - `SMART_ISSUER_ALLOWLIST`
-- `FHIR_BASE_URL`
+- `FHIR_BASE_URL` - must be set explicitly per environment/tenant (no default; the API and worker both fail closed if unset rather than silently hitting the wrong FHIR server)
 - `EXPORT_SIGNING_KEY`
+- `MRN_HASH_SALT` - must be set explicitly per environment (no default; query_runner fails closed rather than hashing patient identifiers with an empty salt)
 
 After first deploy, set `FRONTEND_BASE_URL` in Render to your Netlify site URL.

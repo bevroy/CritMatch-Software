@@ -19,12 +19,12 @@ rule evaluation stays consistent with the cohort matcher.
 
 from __future__ import annotations
 
-import os
 import time
 from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.models import (
     FeasibilityQuestion,
     FeasibilityQuestionnaire,
@@ -33,6 +33,7 @@ from app.db.models import (
 )
 from app.fhir.client import FHIRClient
 from app.services.query_runner import QueryExecutor
+from app.services.smart_token import ensure_fresh_session_claims
 
 
 class FeasibilityExecutionError(RuntimeError):
@@ -61,6 +62,7 @@ def run_feasibility(
     db: Session,
     run_id: str,
     *,
+    session_claims: dict[str, Any] | None = None,
     fhir_client: FHIRClient | None = None,
 ) -> int:
     """Execute a feasibility run; persist per-question counts.
@@ -92,9 +94,20 @@ def run_feasibility(
     client = fhir_client
     try:
         if client is None:
+            # Use the SMART launch that authenticated this request rather than
+            # a shared server-wide token, so queries hit the EHR the user
+            # actually launched from. Raises if the access_token is expired
+            # and can't be refreshed - never falls back to a stale/empty one.
+            claims = session_claims if session_claims is not None else {}
+            claims, refreshed = ensure_fresh_session_claims(claims, settings=get_settings())
+            if refreshed and session_claims is not None:
+                # Mutate the caller's dict in place so routes/feasibility.py
+                # can tell a refresh happened and reissue the session cookie.
+                session_claims.clear()
+                session_claims.update(claims)
             client = FHIRClient(
-                os.getenv("FHIR_BASE_URL", ""),
-                os.getenv("FHIR_ACCESS_TOKEN"),
+                claims.get("fhir_base_url", ""),
+                claims.get("access_token"),
             )
             owns_client = True
 

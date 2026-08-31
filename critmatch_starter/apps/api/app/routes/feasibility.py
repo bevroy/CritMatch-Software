@@ -12,9 +12,11 @@ from __future__ import annotations
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
+from app.core.security import issue_session_token
 from app.db.models import (
     FeasibilityQuestion,
     FeasibilityQuestionnaire,
@@ -25,6 +27,7 @@ from app.db.models import (
 from app.db.session import get_db
 from app.deps.auth import CurrentUser
 from app.fhir.client import FHIRClient
+from app.routes.auth import set_session_cookie
 from app.schemas.feasibility import (
     FeasibilityQuestionInput,
     FeasibilityQuestionResponse,
@@ -305,6 +308,7 @@ def _serialize_run(
 def run_questionnaire(
     questionnaire_id: str,
     request: Request,
+    response: Response,
     user: CurrentUser,
     db: Session = Depends(get_db),
 ) -> FeasibilityRunResponse:
@@ -329,13 +333,26 @@ def run_questionnaire(
     )
     db.commit()
 
-    # Execute synchronously. ``run_feasibility`` builds its own FHIRClient from
-    # env vars; tests inject a fake via dependency override on this route.
+    # Execute synchronously. ``run_feasibility`` builds its FHIRClient from
+    # this session's SMART launch (access_token + fhir_base_url), not a
+    # shared env-configured one; tests inject a fake via dependency override.
+    # It also refreshes an expired access_token in place, so we compare
+    # before/after to know whether to reissue the session cookie below.
+    session_claims = dict(getattr(request.state, "session_claims", {}) or {})
+    original_access_token = session_claims.get("access_token")
     try:
-        run_feasibility(db, str(fr.id), fhir_client=_get_fhir_client_override(request))
+        run_feasibility(
+            db,
+            str(fr.id),
+            session_claims=session_claims,
+            fhir_client=_get_fhir_client_override(request),
+        )
     except FeasibilityExecutionError:
         # Status + error_message already persisted by the engine.
         db.refresh(fr)
+
+    if session_claims.get("access_token") and session_claims.get("access_token") != original_access_token:
+        set_session_cookie(response, get_settings(), issue_session_token(session_claims))
 
     db.refresh(fr)
     results = (

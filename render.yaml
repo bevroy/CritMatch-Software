@@ -25,8 +25,7 @@ services:
       - key: SMART_REDIRECT_URI
         sync: false
       - key: FHIR_BASE_URL
-        # Default to the SMART Health IT public R4 sandbox; override per env.
-        value: https://r4.smarthealthit.org
+        sync: false
       - key: EXPORT_SIGNING_KEY
         sync: false
       - key: MRN_HASH_SALT

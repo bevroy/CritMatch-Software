@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import httpx
+
 
 class FakeFHIR:
     """Tiny in-memory FHIR stand-in compatible with QueryExecutor."""
@@ -194,3 +196,83 @@ def test_other_user_cannot_see_personal_questionnaire(authed_client, db_session)
 
     resp = other_client.get(f"/api/feasibility/questionnaires/{qid}")
     assert resp.status_code == 404
+
+
+def test_run_questionnaire_reissues_cookie_when_access_token_refreshed(
+    client, db_session, authed_user, monkeypatch
+):
+    import time
+
+    from app.core.config import get_settings
+    from app.core.security import issue_session_token, verify_session_token
+    from app.main import app
+
+    # Guard against another test in this session leaving a fake FHIR client
+    # installed on app.state - we want the real session-claims path here.
+    app.state.feasibility_fhir_client = None
+
+    iss = "https://fhir.sandbox.example.com"
+    token_endpoint = f"{iss}/oauth2/token"
+
+    stale_session_token = issue_session_token(
+        {
+            "sub": str(authed_user.id),
+            "role": authed_user.role,
+            "access_token": "stale-access-token",
+            "refresh_token": "refresh-abc",
+            "expires_in": 300,
+            "fhir_base_url": iss,
+            "iat": int(time.time()) - 1000,  # expired well past the leeway
+        }
+    )
+    client.cookies.set(get_settings().session_cookie_name, stale_session_token)
+
+    def fake_fhir_get(self, url, params=None, **_kw):
+        return httpx.Response(200, json={"resourceType": "Bundle", "entry": []})
+
+    def fake_discovery_get(url, **_kw):
+        return httpx.Response(200, json={"token_endpoint": token_endpoint})
+
+    def fake_token_post(url, **_kw):
+        return httpx.Response(
+            200,
+            json={
+                "access_token": "refreshed-access-token",
+                "refresh_token": "refreshed-refresh-token",
+                "expires_in": 600,
+            },
+        )
+
+    monkeypatch.setattr(httpx.Client, "get", fake_fhir_get)
+    monkeypatch.setattr(httpx, "get", fake_discovery_get)
+    monkeypatch.setattr(httpx, "post", fake_token_post)
+
+    from app.services import feasibility_engine as feasibility_engine_module
+
+    class _FakeSettings:
+        smart_client_id = "critmatch-test-client"
+        smart_client_secret = "test-client-secret"
+
+    monkeypatch.setattr(feasibility_engine_module, "get_settings", lambda: _FakeSettings())
+
+    qid = client.post(
+        "/api/feasibility/questionnaires",
+        json={"name": "Refresh check", "questions": [{"text": "t", "logic_json": {}}]},
+    ).json()["id"]
+
+    run_resp = client.post(f"/api/feasibility/questionnaires/{qid}/run")
+    assert run_resp.status_code == 200, run_resp.text
+
+    # Read the Set-Cookie from this response directly rather than the
+    # client-wide cookie jar - the jar can hold both the manually-seeded
+    # stale cookie (domain "") and the server-reissued one (request-host
+    # domain) under the same name, which httpx.Cookies.get() treats as an
+    # ambiguous conflict.
+    reissued_cookie = run_resp.cookies.get(get_settings().session_cookie_name)
+    assert reissued_cookie is not None
+    assert reissued_cookie != stale_session_token
+
+    refreshed_claims = verify_session_token(reissued_cookie)
+    assert refreshed_claims["access_token"] == "refreshed-access-token"
+    assert refreshed_claims["refresh_token"] == "refreshed-refresh-token"
+    assert refreshed_claims["expires_in"] == 600

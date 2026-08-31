@@ -21,6 +21,7 @@ sys.path.insert(0, os.environ.get("API_APP_PATH", "/app/api_app"))
 
 from app.db.models import QueryRun  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
+from app.fhir.client import FHIRRateLimitedError  # noqa: E402
 from app.services.query_runner import QueryExecutionError, run_query  # noqa: E402
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
@@ -54,7 +55,21 @@ def _process(run_id: str) -> None:
             count = run_query(session, run_id)
             log.info("run %s completed (%d matches)", run_id, count)
         except QueryExecutionError as exc:
-            log.exception("run %s failed: %s", run_id, exc)
+            # run_query() wraps every failure in QueryExecutionError, so the
+            # original FHIRRateLimitedError (if any) survives on __cause__.
+            # A 429 means "the server asked us to back off", not "this run
+            # is permanently broken" - surface that distinction in logs even
+            # though there's no retry queue yet to act on it.
+            if isinstance(exc.__cause__, FHIRRateLimitedError):
+                log.warning(
+                    "run %s rate-limited by FHIR server (retry_after=%s); "
+                    "marking failed for now, no retry queue yet: %s",
+                    run_id,
+                    exc.__cause__.retry_after,
+                    exc,
+                )
+            else:
+                log.exception("run %s failed: %s", run_id, exc)
 
 
 def main() -> None:

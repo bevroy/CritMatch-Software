@@ -10,7 +10,11 @@ The launch follows the standard SMART App Launch flow:
 3. After consent the EHR redirects back to the frontend, which forwards the
    ``code`` + ``state`` to ``POST /api/auth/smart/callback``.
 4. We verify state + exchange the code for tokens, validate the id_token,
-   upsert the user and issue a signed session cookie.
+   upsert the user and issue a signed session cookie. The token response's
+   ``access_token``/``refresh_token``/``expires_in`` and the launch ``iss``
+   (the FHIR server base URL) are stored in that same signed cookie so later
+   requests in this session can authenticate their own FHIR calls with the
+   launch's actual token rather than a separately configured static one.
 
 PATCHED (audit fix, critical): ``smart_authorize()`` used to only reject an
 issuer when the allowlist was BOTH configured AND didn't contain it -
@@ -53,9 +57,19 @@ from app.db.models import User
 from app.db.session import get_db
 from app.deps.auth import CurrentUser
 from app.services.audit_service import record as record_audit
+from app.services.smart_token import SmartConfigurationError, discover_smart_configuration
 
 router = APIRouter()
 
+# The only scope this app ever requests, regardless of what a client sends in
+# AuthorizeRequest.scope - narrowed to exactly the resources it reads (see
+# fhir/client.py call sites) instead of the broader patient/*.read.
+SMART_REQUESTED_SCOPE = (
+    "openid fhirUser launch "
+    "patient/Patient.read patient/Condition.read patient/Observation.read "
+    "patient/MedicationRequest.read patient/Encounter.read "
+    "offline_access"
+)
 
 # In-memory state store. For multi-instance deployments swap for Redis or DB.
 _state_store: dict[str, dict[str, Any]] = {}
@@ -78,20 +92,18 @@ def _consume_state(state: str) -> dict[str, Any] | None:
     return payload
 
 
-def _smart_configuration(iss: str) -> dict[str, Any]:
-    well_known = iss.rstrip("/") + "/.well-known/smart-configuration"
-    resp = httpx.get(well_known, timeout=10, headers={"Accept": "application/json"})
-    if resp.status_code != 200:
-        raise HTTPException(status_code=502, detail="SMART configuration not available")
-    return resp.json()
-
-
 class AuthorizeRequest(BaseModel):
     iss: str = Field(..., description="The FHIR server issuer URL provided by the EHR launch")
     launch: str | None = Field(None, description="Opaque launch token from the EHR")
+    # PATCHED (audit fix): accepted for backward compatibility only - ignored
+    # by smart_authorize(), which always requests SMART_REQUESTED_SCOPE
+    # regardless of what a client sends here. A client-controlled scope
+    # string let a modified/compromised frontend ask for anything up to
+    # patient/*.read plus offline_access; the actual set of resources this
+    # app reads is fixed, so the requested scope should be too.
     scope: str = Field(
         default="openid fhirUser launch patient/*.read offline_access",
-        description="OAuth scopes to request",
+        description="Deprecated/ignored - retained for backward compatibility only",
     )
 
 
@@ -135,6 +147,21 @@ def _is_allowed_email(email: str, settings) -> bool:
     return domain in allowed
 
 
+def set_session_cookie(response: Response, settings, token: str) -> None:
+    """Set the signed session cookie. Public - reused wherever a session's
+    claims are refreshed in place (e.g. feasibility_engine's token refresh).
+    """
+    response.set_cookie(
+        key=settings.session_cookie_name,
+        value=token,
+        httponly=True,
+        secure=settings.is_production or settings.session_cookie_samesite == "none",
+        samesite=settings.session_cookie_samesite,
+        max_age=settings.session_ttl_seconds,
+        path="/",
+    )
+
+
 def _issue_session_cookie(response: Response, settings, user: User, claims: dict[str, Any]) -> None:
     session_token = issue_session_token(
         {
@@ -143,15 +170,7 @@ def _issue_session_cookie(response: Response, settings, user: User, claims: dict
             **claims,
         }
     )
-    response.set_cookie(
-        key=settings.session_cookie_name,
-        value=session_token,
-        httponly=True,
-        secure=settings.is_production or settings.session_cookie_samesite == "none",
-        samesite=settings.session_cookie_samesite,
-        max_age=settings.session_ttl_seconds,
-        path="/",
-    )
+    set_session_cookie(response, settings, session_token)
 
 
 def _hash_password(password: str) -> str:
@@ -287,7 +306,10 @@ def smart_authorize(payload: AuthorizeRequest) -> AuthorizeResponse:
     if payload.iss not in settings.smart_issuer_allowlist:
         raise HTTPException(status_code=403, detail="Issuer not in allowlist")
 
-    smart_config = _smart_configuration(payload.iss)
+    try:
+        smart_config = discover_smart_configuration(payload.iss)
+    except SmartConfigurationError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     authorization_endpoint = smart_config.get("authorization_endpoint")
     token_endpoint = smart_config.get("token_endpoint")
     jwks_uri = smart_config.get("jwks_uri")
@@ -310,7 +332,7 @@ def smart_authorize(payload: AuthorizeRequest) -> AuthorizeResponse:
         "response_type": "code",
         "client_id": settings.smart_client_id,
         "redirect_uri": settings.smart_redirect_uri,
-        "scope": payload.scope,
+        "scope": SMART_REQUESTED_SCOPE,
         "state": state,
         "aud": payload.iss,
         "code_challenge": challenge,
@@ -432,6 +454,14 @@ def smart_callback(
             "fhirUser": fhir_user,
             "scope": tokens.get("scope"),
             "_signature_verified": bool(id_claims.get("_signature_verified")),
+            # Persisted so later FHIR calls in this session can authenticate as
+            # this launch instead of falling back to a static server token;
+            # fhir_base_url is the launch `iss`, since the token response
+            # itself carries no server URL of its own.
+            "access_token": tokens.get("access_token"),
+            "refresh_token": tokens.get("refresh_token"),
+            "expires_in": tokens.get("expires_in"),
+            "fhir_base_url": state_data["iss"],
         },
     )
 

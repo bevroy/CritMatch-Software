@@ -30,7 +30,23 @@ import httpx
 
 
 class FHIRError(RuntimeError):
-    pass
+    """Base error for any non-2xx FHIR response.
+
+    ``status_code`` and ``operation_outcome`` (the server's parsed FHIR
+    ``OperationOutcome``, when it returned one) are attached so callers can
+    react to *why* a call failed instead of just logging raw response text.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        operation_outcome: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.operation_outcome = operation_outcome
 
 
 class FHIRSearchTruncated(FHIRError):
@@ -40,6 +56,97 @@ class FHIRSearchTruncated(FHIRError):
     matching the search - treat any correctness-sensitive computation (patient
     counts, match sets, etc.) as invalid rather than partially correct.
     """
+
+
+class FHIRUnauthorizedError(FHIRError):
+    """401: the access token is missing, expired, or otherwise rejected."""
+
+
+class FHIRForbiddenError(FHIRError):
+    """403: the token is valid but lacks the scope/consent for this resource."""
+
+
+class FHIRRateLimitedError(FHIRError):
+    """429: the server is rate-limiting us.
+
+    ``retry_after`` mirrors the response's ``Retry-After`` header - an ``int``
+    number of seconds if the header was numeric, the raw header string if it
+    was an HTTP-date, or ``None`` if the header was absent.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int = 429,
+        retry_after: int | str | None = None,
+        operation_outcome: dict[str, Any] | None = None,
+    ) -> None:
+        super().__init__(message, status_code=status_code, operation_outcome=operation_outcome)
+        self.retry_after = retry_after
+
+
+def _parse_operation_outcome(resp: httpx.Response) -> dict[str, Any] | None:
+    """Return ``{"issues": [{"severity", "code", "diagnostics"}, ...]}`` if
+    ``resp``'s body is a FHIR ``OperationOutcome``, else ``None``.
+    """
+    try:
+        body = resp.json()
+    except ValueError:
+        return None
+    if not isinstance(body, dict) or body.get("resourceType") != "OperationOutcome":
+        return None
+    issues = [
+        {
+            "severity": issue.get("severity"),
+            "code": issue.get("code"),
+            "diagnostics": issue.get("diagnostics"),
+        }
+        for issue in body.get("issue", []) or []
+    ]
+    return {"issues": issues}
+
+
+def _retry_after(resp: httpx.Response) -> int | str | None:
+    raw = resp.headers.get("Retry-After")
+    if raw is None:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return raw
+
+
+def _raise_for_error(resp: httpx.Response, context: str) -> None:
+    """Raise the ``FHIRError`` subclass matching ``resp``'s status code.
+
+    Called only for non-2xx responses. Prefers OperationOutcome
+    severity/diagnostics over raw response text when the server provided one.
+    """
+    operation_outcome = _parse_operation_outcome(resp)
+    if operation_outcome and operation_outcome["issues"]:
+        detail = "; ".join(
+            f"{issue.get('severity') or 'error'}: "
+            f"{issue.get('diagnostics') or issue.get('code') or 'no diagnostics'}"
+            for issue in operation_outcome["issues"]
+        )
+    else:
+        detail = resp.text[:200]
+    message = f"{context} -> {resp.status_code}: {detail}"
+
+    if resp.status_code == 401:
+        raise FHIRUnauthorizedError(
+            message, status_code=401, operation_outcome=operation_outcome
+        )
+    if resp.status_code == 403:
+        raise FHIRForbiddenError(message, status_code=403, operation_outcome=operation_outcome)
+    if resp.status_code == 429:
+        raise FHIRRateLimitedError(
+            message,
+            retry_after=_retry_after(resp),
+            operation_outcome=operation_outcome,
+        )
+    raise FHIRError(message, status_code=resp.status_code, operation_outcome=operation_outcome)
 
 
 class FHIRClient:
@@ -79,7 +186,7 @@ class FHIRClient:
     def read(self, reference: str) -> dict[str, Any]:
         resp = self._client.get(f"/{reference.lstrip('/')}" )
         if resp.status_code != 200:
-            raise FHIRError(f"FHIR read {reference} -> {resp.status_code}: {resp.text[:200]}")
+            _raise_for_error(resp, f"FHIR read {reference}")
         return resp.json()
 
     def search(
@@ -126,9 +233,7 @@ class FHIRClient:
                 return
             resp = self._client.get(url, params=flat_params if pages == 0 else None)
             if resp.status_code != 200:
-                raise FHIRError(
-                    f"FHIR search {resource_type} -> {resp.status_code}: {resp.text[:200]}"
-                )
+                _raise_for_error(resp, f"FHIR search {resource_type}")
             bundle = resp.json()
             for entry in bundle.get("entry", []) or []:
                 resource = entry.get("resource")

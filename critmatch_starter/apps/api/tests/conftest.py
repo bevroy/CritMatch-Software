@@ -69,6 +69,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
 os.environ.setdefault("SESSION_SECRET", "test-secret-please-change")
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("FRONTEND_BASE_URL", "http://localhost:3000")
+os.environ.setdefault("MRN_HASH_SALT", "test-mrn-hash-salt")
 
 # sqlite3 doesn't know how to bind UUID/dict natively
 sqlite3.register_adapter(uuid.UUID, lambda u: str(u))
