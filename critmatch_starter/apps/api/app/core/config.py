@@ -110,6 +110,19 @@ class Settings:
         signature verification.
         """
         return self.app_env.lower() in {"local", "development", "dev", "test"}
+    @property
+    def require_email_domain_for_smart_login(self) -> bool:
+        """Mirrors allow_unverified_smart_id_token's environment allowlist.
+
+        Sandbox/test SMART launches (Epic/Cerner sandbox users typically
+        carry no email claim at all) skip the organizational email-domain
+        check that smart_callback() otherwise enforces on every SMART
+        login. First-party email/password login (email_login()) is never
+        affected by this - it always enforces the allowlist regardless of
+        APP_ENV.
+        """
+        return self.app_env.lower() not in {"local", "development", "dev", "test"}
+
 
     @property
     def allowed_origins(self) -> list[str]:
