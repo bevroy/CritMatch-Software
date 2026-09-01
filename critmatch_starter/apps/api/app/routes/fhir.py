@@ -106,9 +106,13 @@ def launch_context(
     system-configured ``FHIR_BASE_URL`` with no patient context), this uses
     the *launch's own* access token and FHIR server - both persisted on the
     session cookie by ``routes/auth.py::smart_callback`` - to read the
-    launched patient plus a few AllergyIntolerance entries. That's proof the
+    launched patient plus a few active Condition entries. That's proof the
     end-to-end SMART launch actually authenticates real FHIR reads, not just
     that the OAuth handshake completed.
+
+    Reads only Patient and Condition - both already covered by
+    SMART_REQUESTED_SCOPE in routes/auth.py - rather than requesting any
+    additional scope just for this verification endpoint.
 
     Built for sandbox verification, not the cohort-matching flow (which
     reads via a separately configured system-level FHIR_BASE_URL/token).
@@ -142,9 +146,9 @@ def launch_context(
     client = FHIRClient(claims["fhir_base_url"], claims["access_token"])
     try:
         patient = client.read(f"Patient/{patient_id}")
-        allergies = list(
+        conditions = list(
             client.search(
-                "AllergyIntolerance",
+                "Condition",
                 {"patient": patient_id},
                 page_limit=1,
                 on_limit="truncate",
@@ -164,18 +168,15 @@ def launch_context(
         or patient.get("id")
     )
 
-    def _allergy_summary(a: dict) -> dict:
-        code = a.get("code") or {}
+    def _condition_summary(c: dict) -> dict:
+        code = c.get("code") or {}
         coding = (code.get("coding") or [{}])[0]
-        reaction_list = a.get("reaction") or []
-        reaction_name = None
-        if reaction_list:
-            manifestation = (reaction_list[0].get("manifestation") or [{}])[0]
-            reaction_name = (manifestation.get("coding") or [{}])[0].get("display")
+        clinical_status = (
+            ((c.get("clinicalStatus") or {}).get("coding") or [{}])[0].get("code")
+        )
         return {
             "name": coding.get("display") or code.get("text"),
-            "criticality": a.get("criticality"),
-            "reaction": reaction_name,
+            "clinical_status": clinical_status,
         }
 
     return {
@@ -184,6 +185,6 @@ def launch_context(
         "patient_name": display_name,
         "birth_date": patient.get("birthDate"),
         "gender": patient.get("gender"),
-        "allergy_count": len(allergies),
-        "allergies": [_allergy_summary(a) for a in allergies],
+        "condition_count": len(conditions),
+        "conditions": [_condition_summary(c) for c in conditions],
     }
