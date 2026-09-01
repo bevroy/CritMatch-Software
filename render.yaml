@@ -42,7 +42,7 @@ services:
   - type: worker
     name: critmatch-worker
     env: docker
-    plan: free
+    plan: starter
     rootDir: critmatch_starter
     dockerfilePath: apps/worker/Dockerfile
     autoDeploy: true
