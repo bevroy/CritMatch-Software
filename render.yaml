@@ -43,6 +43,7 @@ services:
     name: critmatch-worker
     env: docker
     plan: starter
+    region: virginia
     rootDir: critmatch_starter
     dockerfilePath: apps/worker/Dockerfile
     autoDeploy: true
