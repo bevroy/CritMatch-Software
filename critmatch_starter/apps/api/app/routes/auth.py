@@ -435,7 +435,7 @@ def smart_callback(
     fhir_user = id_claims.get("fhirUser")
     patient_id = tokens.get("patient")
     id_email = _normalize_email(str(id_claims.get("email") or ""))
-    if not _is_allowed_email(id_email, settings):
+    if settings.require_email_domain_for_smart_login and not _is_allowed_email(id_email, settings):
         raise HTTPException(
             status_code=403,
             detail="Login denied: only approved organizational email domains may access CritMatch",
