@@ -23,6 +23,6 @@
 # same-origin with Netlify.
 [[redirects]]
   from = "/api/*"
-  to = "https://critmatch-api-2106.onrender.com/api/:splat"
+  to = "https://critmatch-epic-test.onrender.com/api/:splat"
   status = 200
   force = true
