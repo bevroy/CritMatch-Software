@@ -410,7 +410,7 @@ def smart_callback(
         id_claims = verify_smart_id_token(
             id_token,
             audience=settings.smart_client_id,
-            issuer=state_data["iss"],
+            issuer=None,  # PATCHED (bug fix): id_token iss is the OIDC issuer (e.g. Epic's .../oauth2), not the FHIR base iss used for the launch - signature+audience checks below still bind this token to the allowlisted issuer's JWKS
             jwks_uri=state_data.get("jwks_uri"),
         )
     except Exception as exc:
