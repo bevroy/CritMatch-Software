@@ -3,6 +3,8 @@ uvicorn[standard]==0.34.0
 pydantic==2.11.3
 python-dotenv==1.1.0
 httpx==0.28.1
+# CA bundle used by httpx; 2026.10.19 removes the compromised eMudhra roots
+certifi>=2026.10.19
 sentry-sdk[fastapi]==2.28.0
 sqlalchemy==2.0.40
 psycopg[binary]==3.2.6

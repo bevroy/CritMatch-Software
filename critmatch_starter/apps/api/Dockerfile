@@ -1,4 +1,6 @@
 FROM python:3.12-slim
+# Upgrade the system CA store on every build (eMudhra CA compromise, Oct 2026: Render advisory)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt ./

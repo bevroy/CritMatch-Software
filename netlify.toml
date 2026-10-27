@@ -10,7 +10,7 @@
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "20"
+  NODE_VERSION = "22.23.4"
   # Make all client fetches go through Netlify so the session cookie is
   # first-party (avoids third-party cookie blocking).
   NEXT_PUBLIC_API_BASE_URL = ""
